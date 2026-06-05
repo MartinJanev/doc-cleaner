@@ -1,0 +1,10 @@
+# Core pipeline dependencies
+docling>=2.0.0
+ollama>=0.3.0
+watchdog>=4.0.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+structlog>=24.1.0
+
+# Tooling
+pytest>=7.4.0

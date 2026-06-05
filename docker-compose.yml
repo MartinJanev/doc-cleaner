@@ -1,0 +1,25 @@
+services:
+  pipeline:
+    build: .
+    container_name: doc-cleaner
+    restart: unless-stopped
+    environment:
+      # Talk to the Ollama server running on the host machine.
+      DOCPIPE_OLLAMA_HOST: http://host.docker.internal:11434
+      DOCPIPE_MODEL_TAG: llama3
+      DOCPIPE_INPUT_DIR: /app/data/input
+      DOCPIPE_OUTPUT_DIR: /app/data/output
+      DOCPIPE_STATE_FILE: /app/data/.pipeline_state.json
+      DOCPIPE_MAX_WORKERS: "1"
+      DOCPIPE_LOG_LEVEL: INFO
+      DOCPIPE_LOG_JSON: "true"
+    volumes:
+      # Persist inputs, outputs, the ledger, and Docling's model cache.
+      - ./data:/app/data
+      - docling_cache:/home/appuser/.cache
+    # Required so host.docker.internal resolves on Linux (no-op on macOS/Windows).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  docling_cache:

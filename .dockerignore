@@ -1,0 +1,17 @@
+.git
+.gitignore
+.venv
+.idea
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+data/input/*
+data/output/*
+.pipeline_state.json
+*.db
+.DS_Store
+README.md
+AGENTS.md
+tests
+.env

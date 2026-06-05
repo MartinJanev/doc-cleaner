@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.pytest_cache/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+
+# App runtime
+.env
+.pipeline_state.json
+*.db
+data/input/*
+data/output/markdown/*
+data/output/metadata/*
+
+# Keep the directory structure
+!data/input/.gitkeep
+!data/output/markdown/.gitkeep
+!data/output/metadata/.gitkeep
