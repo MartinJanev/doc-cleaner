@@ -49,7 +49,20 @@ class Settings(BaseSettings):
     llm_max_chars: int = Field(
         default=12_000,
         ge=1_000,
-        description="Max characters of Markdown sent to the LLM in one pass.",
+        description="Characters of Markdown used for the metadata pass. Small "
+        "documents are still refined in a single pass within this budget.",
+    )
+    llm_chunk_chars: int = Field(
+        default=8_000,
+        ge=1_000,
+        description="Documents larger than this are cleaned in chunks of roughly "
+        "this size, lifting the single-pass output ceiling for long files.",
+    )
+    llm_num_ctx: int = Field(
+        default=8_192,
+        ge=512,
+        description="Token context window requested from Ollama. Must comfortably "
+        "fit one chunk plus its cleaned output; raise it for bigger chunks.",
     )
     llm_timeout_s: int = Field(
         default=180,

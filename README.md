@@ -112,7 +112,7 @@ Your local `./data` folder is mounted into the container, so inputs, outputs, an
 Docling and Ollama are both memory-hungry, and running them side by side on one machine is demanding. A few things worth knowing:
 
 - Docling downloads layout models on first run. Plan for roughly **8–16 GB of RAM**, and keep `DOCPIPE_MAX_WORKERS` low (default `1`).
-- Large documents are truncated to `DOCPIPE_LLM_MAX_CHARS` for the refining pass so they fit in the model's context window.
+- Long documents are **cleaned in chunks** rather than truncated: anything larger than `DOCPIPE_LLM_CHUNK_CHARS` is refined fragment by fragment, then analyzed for metadata in a final pass. This keeps multi-page files (well past ~17 pages) from being cut off. Larger chunks need a larger `DOCPIPE_LLM_NUM_CTX` (the Ollama context window) and more RAM.
 - Files that are still being copied in are debounced and size-checked before processing, so partial files won't be picked up.
 
 ## Tests

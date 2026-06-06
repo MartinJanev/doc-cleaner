@@ -37,11 +37,107 @@ USER_PROMPT_TEMPLATE = (
     "---- END MARKDOWN ----"
 )
 
+# --- Chunked refining (large documents) ------------------------------------
+# Long documents are cleaned one fragment at a time so the model never has to
+# echo the whole body back in a single response. Metadata is derived in a
+# separate pass over the assembled result.
+
+CLEAN_SYSTEM_PROMPT = (
+    "You are a meticulous document-cleaning assistant inside a local RAG "
+    "ingestion pipeline. You receive ONE FRAGMENT of Markdown that was "
+    "machine-extracted from a PDF or DOCX. Clean it WITHOUT inventing content:\n"
+    "1. Fix broken headings, merged words, stray page numbers, and hyphenated "
+    "line breaks.\n"
+    "2. Preserve all tables as valid Markdown pipe tables.\n"
+    "3. Do NOT add a title, summary, or any commentary — return only the cleaned "
+    "fragment, and never drop content.\n\n"
+    "Respond with a SINGLE JSON object and nothing else:\n"
+    "{\n"
+    '  "markdown": string (the cleaned Markdown fragment)\n'
+    "}"
+)
+
+METADATA_SYSTEM_PROMPT = (
+    "You derive top-level properties for a document in a local RAG pipeline. You "
+    "receive cleaned Markdown (which may be truncated). Respond with a SINGLE "
+    "JSON object and nothing else:\n"
+    "{\n"
+    '  "title": string,\n'
+    '  "summary": string (2-4 sentences),\n'
+    '  "author": string ("Unknown" if not present),\n'
+    '  "tags": array of 3-8 short lowercase keyword strings\n'
+    "}"
+)
+
+CLEAN_PROMPT_TEMPLATE = (
+    "Clean the following Markdown fragment. Return only the JSON object "
+    "described in the system prompt.\n\n"
+    "---- BEGIN FRAGMENT ----\n"
+    "{markdown}\n"
+    "---- END FRAGMENT ----"
+)
+
+METADATA_PROMPT_TEMPLATE = (
+    "Derive the document properties from the Markdown below. Return only the "
+    "JSON object described in the system prompt.\n\n"
+    "---- BEGIN MARKDOWN ----\n"
+    "{markdown}\n"
+    "---- END MARKDOWN ----"
+)
+
 
 def build_user_prompt(markdown: str, max_chars: int) -> str:
-    """Render the user prompt, truncating overly long Markdown."""
+    """Render the single-pass clean+analyze prompt, truncating long Markdown."""
     body = markdown if len(markdown) <= max_chars else markdown[:max_chars]
     return USER_PROMPT_TEMPLATE.format(markdown=body)
+
+
+def build_clean_prompt(fragment: str) -> str:
+    """Render the cleaning prompt for one Markdown fragment."""
+    return CLEAN_PROMPT_TEMPLATE.format(markdown=fragment)
+
+
+def build_metadata_prompt(markdown: str, max_chars: int) -> str:
+    """Render the metadata prompt over an overview of the cleaned body."""
+    body = markdown if len(markdown) <= max_chars else markdown[:max_chars]
+    return METADATA_PROMPT_TEMPLATE.format(markdown=body)
+
+
+def chunk_markdown(markdown: str, max_chars: int) -> list[str]:
+    """Split Markdown into chunks of at most ``max_chars``, on block boundaries.
+
+    Blocks (separated by blank lines) are packed greedily so headings stay with
+    their surrounding text where possible. A single block larger than the budget
+    is hard-split as a last resort so no content is ever dropped.
+    """
+    text = markdown.strip()
+    if not text:
+        return []
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks: list[str] = []
+    current = ""
+    for block in re.split(r"\n\s*\n", text):
+        block = block.strip()
+        if not block:
+            continue
+        candidate = f"{current}\n\n{block}" if current else block
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+            current = ""
+        if len(block) <= max_chars:
+            current = block
+        else:
+            chunks.extend(
+                block[i : i + max_chars] for i in range(0, len(block), max_chars)
+            )
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def parse_llm_json(content: str) -> dict[str, Any]:

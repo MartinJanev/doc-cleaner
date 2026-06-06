@@ -40,7 +40,7 @@ class ExtractionService:
         try:
             result = self._converter.convert(str(path))
             markdown = result.document.export_to_markdown()
-        except Exception as exc:  # Docling raises a variety of internal errors
+        except Exception as exc:
             raise ExtractionError(f"Docling failed on {path.name}: {exc}") from exc
 
         if not markdown or not markdown.strip():

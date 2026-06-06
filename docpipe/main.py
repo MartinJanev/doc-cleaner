@@ -21,8 +21,6 @@ from docpipe.watcher.runner import WatcherRunner
 
 def build_runner(settings: Settings) -> WatcherRunner:
     """Wire up every dependency and return a ready-to-start runner."""
-    # Heavy third-party clients are imported lazily so unit tests and --help
-    # do not pay the Docling/Ollama import cost.
     from docling.document_converter import DocumentConverter
     from ollama import Client
 
@@ -50,6 +48,8 @@ def build_runner(settings: Settings) -> WatcherRunner:
         client=ollama_client,
         model=settings.model_tag,
         max_chars=settings.llm_max_chars,
+        chunk_chars=settings.llm_chunk_chars,
+        num_ctx=settings.llm_num_ctx,
         temperature=settings.llm_temperature,
     )
 
