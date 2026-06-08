@@ -52,8 +52,13 @@ class WatcherRunner:
         logger.info("runner.reconcile", enqueued=count)
         return count
 
-    def start(self) -> None:
-        """Run the daemon until interrupted."""
+    def start_background(self) -> None:
+        """Start the queue and observer without blocking the calling thread.
+
+        Use this when embedding the watcher under another foreground process
+        (e.g. the web server). The observer and worker threads are daemons, so
+        they run happily in the background. Call ``stop()`` to tear them down.
+        """
         self._repository.ensure_directories()
         self._queue.start()
         self.reconcile()
@@ -67,11 +72,18 @@ class WatcherRunner:
         self._observer.start()
         logger.info("runner.watching", input_dir=str(self._input_dir))
 
+    def start(self) -> None:
+        """Run the daemon in the foreground until interrupted."""
+        self.start_background()
         self._install_signal_handlers()
         try:
             self._stop_event.wait()
         finally:
-            self._shutdown()
+            self.stop()
+
+    def stop(self) -> None:
+        """Tear down the observer and drain the job queue."""
+        self._shutdown()
 
     def _install_signal_handlers(self) -> None:
         def _handle(signum: int, _frame: object) -> None:

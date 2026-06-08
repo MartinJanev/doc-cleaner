@@ -26,3 +26,7 @@ class LLMServiceError(PipelineError):
 
 class StorageError(PipelineError):
     """Raised when reading inputs or writing outputs / the state ledger fails."""
+
+
+class UploadTooLargeError(StorageError):
+    """Raised when an uploaded file exceeds the configured size limit."""

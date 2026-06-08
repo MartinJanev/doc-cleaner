@@ -76,6 +76,11 @@ class JsonStateStore:
             record = self._records.get(file_hash)
             return record is not None and record.state is ProcessingState.COMPLETED
 
+    def records(self) -> dict[str, DocumentRecord]:
+        """Return a snapshot copy of all ledger records, keyed by content hash."""
+        with self._lock:
+            return dict(self._records)
+
     def should_process(self, file_hash: str, max_attempts: int) -> bool:
         """Return True if a document needs (re)processing.
 
@@ -130,6 +135,19 @@ class JsonStateStore:
             record.updated_at = _utc_now()
             self._flush()
             return record
+
+    def delete(self, file_hash: str) -> bool:
+        """Remove a record from the ledger. Returns True if one was removed.
+
+        Clearing an entry makes ``should_process`` return True again, which is
+        how the web layer forces a retry or full reprocess of a document.
+        """
+        with self._lock:
+            if file_hash not in self._records:
+                return False
+            del self._records[file_hash]
+            self._flush()
+            return True
 
 
 def _utc_now() -> str:

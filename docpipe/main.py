@@ -8,6 +8,8 @@ test.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from docpipe.core.config import Settings
 from docpipe.core.logging import configure_logging, get_logger
 from docpipe.pipeline.processor import DocumentProcessor
@@ -19,8 +21,19 @@ from docpipe.watcher.job_queue import JobQueue
 from docpipe.watcher.runner import WatcherRunner
 
 
-def build_runner(settings: Settings) -> WatcherRunner:
-    """Wire up every dependency and return a ready-to-start runner."""
+@dataclass
+class Components:
+    """The fully-wired collaborators shared by the watcher and the web UI."""
+
+    repository: FileRepository
+    state_store: JsonStateStore
+    job_queue: JobQueue
+    processor: DocumentProcessor
+    runner: WatcherRunner
+
+
+def build_components(settings: Settings) -> Components:
+    """Instantiate and inject every concrete dependency in one place."""
     from docling.document_converter import DocumentConverter
     from ollama import Client
 
@@ -32,6 +45,7 @@ def build_runner(settings: Settings) -> WatcherRunner:
         model=settings.model_tag,
         ollama_host=settings.ollama_host,
         max_workers=settings.max_workers,
+        web_enabled=settings.web_enabled,
     )
 
     repository = FileRepository(
@@ -62,20 +76,53 @@ def build_runner(settings: Settings) -> WatcherRunner:
     )
 
     job_queue = JobQueue(handler=processor.process, max_workers=settings.max_workers)
-    return WatcherRunner(
+    runner = WatcherRunner(
         input_dir=settings.input_dir,
         processor=processor,
         repository=repository,
         job_queue=job_queue,
         debounce_seconds=settings.debounce_seconds,
     )
+    return Components(
+        repository=repository,
+        state_store=state_store,
+        job_queue=job_queue,
+        processor=processor,
+        runner=runner,
+    )
+
+
+def build_runner(settings: Settings) -> WatcherRunner:
+    """Wire up every dependency and return a ready-to-start runner."""
+    return build_components(settings).runner
 
 
 def main() -> None:
     settings = Settings()
     configure_logging(level=settings.log_level, json_logs=settings.log_json)
-    runner = build_runner(settings)
-    runner.start()
+    components = build_components(settings)
+
+    if not settings.web_enabled:
+        components.runner.start()
+        return
+
+    import uvicorn
+
+    from docpipe.web.app import create_app
+    from docpipe.web.service import DocumentService
+
+    service = DocumentService(
+        settings=settings,
+        repository=components.repository,
+        state_store=components.state_store,
+        submit_job=components.job_queue.submit,
+    )
+    app = create_app(service, runner=components.runner)
+
+    get_logger("docpipe.main").info(
+        "web.serving", host=settings.web_host, port=settings.web_port
+    )
+    uvicorn.run(app, host=settings.web_host, port=settings.web_port)
 
 
 if __name__ == "__main__":

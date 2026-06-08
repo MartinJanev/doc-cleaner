@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>doc-cleaner</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">DC</span>
+        <div>
+          <h1>doc-cleaner</h1>
+          <p class="tagline">PDF &amp; DOCX &rarr; clean, LLM-ready Markdown</p>
+        </div>
+      </div>
+      <div class="status" id="conn-status" title="Live updates">
+        <span class="dot"></span><span id="conn-label">connecting&hellip;</span>
+      </div>
+    </header>
+
+    <main>
+      <section
+        id="dropzone"
+        class="dropzone"
+        aria-label="Upload documents"
+        tabindex="0"
+      >
+        <input id="file-input" type="file" accept=".pdf,.docx" multiple hidden />
+        <div class="dropzone-inner">
+          <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <strong>Drop PDF or DOCX files here</strong>
+          <span>or click to browse</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Documents</h2>
+          <div class="stats" id="stats" aria-label="Document counts">
+            <span class="stat total"><b id="stat-total">0</b> total</span>
+            <span class="stat working"><b id="stat-working">0</b> processing</span>
+            <span class="stat ok"><b id="stat-completed">0</b> completed</span>
+            <span class="stat bad"><b id="stat-failed">0</b> failed</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th class="progress-col">Progress</th>
+                <th>Updated</th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="doc-rows">
+              <tr class="empty">
+                <td colspan="4">No documents yet &mdash; upload one to begin.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <div id="preview" class="drawer" hidden aria-hidden="true">
+      <div class="drawer-head">
+        <div class="drawer-title">
+          <h3 id="preview-title">Preview</h3>
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="markdown" role="tab">
+              Markdown
+            </button>
+            <button class="tab" data-tab="metadata" role="tab">Metadata</button>
+          </div>
+        </div>
+        <div class="drawer-tools">
+          <a
+            id="dl-markdown"
+            class="btn"
+            href="#"
+            download
+            title="Download Markdown"
+            >Download .md</a
+          >
+          <a
+            id="dl-metadata"
+            class="btn"
+            href="#"
+            download
+            title="Download metadata"
+            >Download .json</a
+          >
+          <button id="preview-close" class="icon-btn" aria-label="Close">
+            &times;
+          </button>
+        </div>
+      </div>
+      <div id="preview-body" class="preview-body"></div>
+    </div>
+
+    <div id="modal" class="modal-overlay" hidden>
+      <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-title">
+        <h3 id="modal-title">Delete document?</h3>
+        <p id="modal-text">
+          This removes the input file, its cleaned outputs, and its processing
+          history. This cannot be undone.
+        </p>
+        <div class="modal-actions">
+          <button id="modal-cancel" class="btn">Cancel</button>
+          <button id="modal-confirm" class="btn danger solid">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/markdown.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -60,3 +60,25 @@ def test_transitions_record_error_and_clear_on_restart(store: JsonStateStore) ->
     restarted = store.start("hash-a", "/in/a.pdf")
     assert restarted.error is None
     assert restarted.state is ProcessingState.PENDING
+
+
+def test_delete_removes_record_and_allows_reprocess(store: JsonStateStore) -> None:
+    store.start("hash-a", "/in/a.pdf")
+    store.mark("hash-a", ProcessingState.COMPLETED)
+    assert store.should_process("hash-a", max_attempts=3) is False
+
+    assert store.delete("hash-a") is True
+    assert store.get("hash-a") is None
+    assert store.should_process("hash-a", max_attempts=3) is True
+    assert store.delete("hash-a") is False  # already gone
+
+
+def test_records_returns_snapshot(store: JsonStateStore) -> None:
+    store.start("hash-a", "/in/a.pdf")
+    store.start("hash-b", "/in/b.docx")
+
+    snapshot = store.records()
+    assert set(snapshot) == {"hash-a", "hash-b"}
+
+    snapshot.clear()  # mutating the copy must not affect the store
+    assert set(store.records()) == {"hash-a", "hash-b"}

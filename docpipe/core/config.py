@@ -93,6 +93,29 @@ class Settings(BaseSettings):
         description="File extensions the pipeline will process.",
     )
 
+    # --- Web interface ------------------------------------------------------
+    web_enabled: bool = Field(
+        default=True,
+        description="Serve the web UI alongside the watcher. Disable for a "
+        "headless watcher-only daemon (e.g. some Docker setups).",
+    )
+    web_host: str = Field(
+        default="127.0.0.1",
+        description="Interface the web server binds to. Use 0.0.0.0 to expose "
+        "it outside the host (e.g. inside Docker).",
+    )
+    web_port: int = Field(
+        default=8000,
+        ge=1,
+        le=65_535,
+        description="Port the web server listens on.",
+    )
+    web_max_upload_mb: int = Field(
+        default=200,
+        ge=1,
+        description="Maximum size, in megabytes, accepted for a single upload.",
+    )
+
     # --- Logging ------------------------------------------------------------
     log_level: str = Field(default="INFO")
     log_json: bool = Field(

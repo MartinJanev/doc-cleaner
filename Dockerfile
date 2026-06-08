@@ -45,9 +45,13 @@ ENV DOCPIPE_INPUT_DIR=/app/data/input \
     DOCPIPE_STATE_FILE=/app/data/.pipeline_state.json \
     DOCPIPE_OLLAMA_HOST=http://host.docker.internal:11434 \
     DOCPIPE_MODEL_TAG=llama3 \
-    DOCPIPE_MAX_WORKERS=1
+    DOCPIPE_MAX_WORKERS=1 \
+    DOCPIPE_WEB_HOST=0.0.0.0 \
+    DOCPIPE_WEB_PORT=8000
 
 RUN mkdir -p /app/data/input /app/data/output && chown -R appuser:appuser /app
 USER appuser
+
+EXPOSE 8000
 
 CMD ["python", "-m", "docpipe.main"]

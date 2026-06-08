@@ -13,6 +13,11 @@ services:
       DOCPIPE_MAX_WORKERS: "1"
       DOCPIPE_LOG_LEVEL: INFO
       DOCPIPE_LOG_JSON: "true"
+      # Bind the web UI to all interfaces so the published port is reachable.
+      DOCPIPE_WEB_HOST: 0.0.0.0
+      DOCPIPE_WEB_PORT: "8000"
+    ports:
+      - "8000:8000"
     volumes:
       # Persist inputs, outputs, the ledger, and Docling's model cache.
       - ./data:/app/data
