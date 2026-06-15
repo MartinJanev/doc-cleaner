@@ -26,3 +26,4 @@ data/output/metadata/*
 !data/output/metadata/.gitkeep
 AGENTS.md
 .env.example
+PROJECT_NOTES.md

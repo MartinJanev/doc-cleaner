@@ -22,8 +22,6 @@ const els = {
   fileInput: document.getElementById("file-input"),
   rows: document.getElementById("doc-rows"),
   toasts: document.getElementById("toasts"),
-  conn: document.getElementById("conn-status"),
-  connLabel: document.getElementById("conn-label"),
   statTotal: document.getElementById("stat-total"),
   statWorking: document.getElementById("stat-working"),
   statCompleted: document.getElementById("stat-completed"),
@@ -45,7 +43,6 @@ const els = {
 const state = {
   docs: new Map(), // id -> doc
   pending: new Set(), // ids with an action in flight (skip actions repaint)
-  failCount: 0,
   activePreview: null, // { id, tab }
 };
 
@@ -75,20 +72,6 @@ function toast(message, kind = "") {
     el.classList.add("leaving");
     setTimeout(() => el.remove(), 250);
   }, 3500);
-}
-
-function setConnection(ok) {
-  if (ok) {
-    state.failCount = 0;
-    els.conn.className = "status live";
-    els.connLabel.textContent = "live";
-  } else {
-    state.failCount += 1;
-    if (state.failCount >= 2) {
-      els.conn.className = "status down";
-      els.connLabel.textContent = "offline";
-    }
-  }
 }
 
 // --- Rendering ---------------------------------------------------------------
@@ -183,6 +166,7 @@ function render(documents) {
   if (!documents.length) {
     tbody.innerHTML =
       '<tr class="empty"><td colspan="4">No documents yet — upload one to begin.</td></tr>';
+    syncPreviewUi();
     return;
   }
   if (empty) empty.remove();
@@ -206,6 +190,7 @@ function render(documents) {
 
   // Remove rows no longer present.
   existing.forEach((tr) => tr.remove());
+  syncPreviewUi();
 }
 
 function updateStats(documents) {
@@ -231,9 +216,8 @@ async function refresh() {
     if (!res.ok) throw new Error("bad status");
     const data = await res.json();
     render(data.documents || []);
-    setConnection(true);
   } catch (err) {
-    setConnection(false);
+    // Polling failed; next tick will retry.
   }
 }
 
@@ -283,6 +267,26 @@ async function manage(action, id, button) {
 
 // --- Preview drawer ----------------------------------------------------------
 
+function previewId(id) {
+  return String(id);
+}
+
+function isPreviewOpen() {
+  return state.activePreview !== null && els.preview.hidden === false;
+}
+
+function syncPreviewUi() {
+  const activeId = state.activePreview ? previewId(state.activePreview.id) : null;
+  const isOpen = isPreviewOpen();
+
+  document.body.classList.toggle("preview-open", isOpen);
+
+  els.rows.querySelectorAll("tr[data-id]").forEach((tr) => {
+    const id = previewId(tr.dataset.id);
+    tr.classList.toggle("selected", isOpen && id === activeId);
+  });
+}
+
 function renderMetadata(text) {
   let data;
   try {
@@ -327,22 +331,24 @@ function renderMarkdownPreview(text) {
 }
 
 async function openPreview(id, tab = "markdown") {
-  const doc = state.docs.get(id);
-  state.activePreview = { id, tab };
-  els.previewTitle.textContent = doc ? doc.name : id;
+  const docId = previewId(id);
+  const doc = state.docs.get(docId) ?? state.docs.get(id);
+  state.activePreview = { id: docId, tab };
+  els.previewTitle.textContent = doc ? doc.name : docId;
   els.tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
 
-  els.dlMarkdown.href = `/download/markdown/${id}`;
-  els.dlMetadata.href = `/download/metadata/${id}`;
+  els.dlMarkdown.href = `/download/markdown/${docId}`;
+  els.dlMetadata.href = `/download/metadata/${docId}`;
   els.dlMetadata.style.display =
     doc && doc.has_metadata === false ? "none" : "";
 
   els.preview.hidden = false;
   els.preview.setAttribute("aria-hidden", "false");
+  syncPreviewUi();
   els.previewBody.innerHTML = '<div class="loading-text">Loading…</div>';
 
   try {
-    const res = await fetch(`/api/documents/${id}/${tab}`);
+    const res = await fetch(`/api/documents/${docId}/${tab}`);
     if (!res.ok) throw new Error("not available");
     const text = await res.text();
     els.previewBody.innerHTML =
@@ -357,6 +363,7 @@ function closePreview() {
   els.preview.hidden = true;
   els.preview.setAttribute("aria-hidden", "true");
   state.activePreview = null;
+  syncPreviewUi();
 }
 
 // --- Confirm modal -----------------------------------------------------------
@@ -415,20 +422,28 @@ function bindEvents() {
 
   els.rows.addEventListener("click", async (e) => {
     const btn = e.target.closest("button[data-act]");
-    if (!btn) return;
-    const { act, id } = btn.dataset;
-    if (act === "preview") {
-      openPreview(id);
-    } else if (act === "delete") {
-      const ok = await confirmDialog({
-        title: "Delete document?",
-        text: "This removes the input file, its cleaned outputs, and its processing history. This cannot be undone.",
-        confirmLabel: "Delete",
-      });
-      if (ok) manage("delete", id, btn);
-    } else {
-      manage(act, id, btn);
+    if (btn) {
+      const { act, id } = btn.dataset;
+      if (act === "preview") {
+        openPreview(id);
+      } else if (act === "delete") {
+        const ok = await confirmDialog({
+          title: "Delete document?",
+          text: "This removes the input file, its cleaned outputs, and its processing history. This cannot be undone.",
+          confirmLabel: "Delete",
+        });
+        if (ok) manage("delete", id, btn);
+      } else {
+        manage(act, id, btn);
+      }
+      return;
     }
+
+    const tr = e.target.closest("tr[data-id]");
+    if (!tr) return;
+    const doc = state.docs.get(tr.dataset.id);
+    if (!doc?.has_markdown) return;
+    openPreview(tr.dataset.id);
   });
 
   els.previewClose.addEventListener("click", closePreview);

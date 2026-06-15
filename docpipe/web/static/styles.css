@@ -13,6 +13,7 @@
   --blue: #58a6ff;
   --radius: 12px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --drawer-width: min(620px, 94vw);
 }
 
 * {
@@ -56,15 +57,11 @@ body {
 }
 
 .logo {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), #9d7bff);
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #fff;
+  flex-shrink: 0;
 }
 
 .brand h1 {
@@ -78,42 +75,6 @@ body {
   color: var(--muted);
 }
 
-.status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.status .dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--muted);
-}
-
-.status.live .dot {
-  background: var(--green);
-  animation: pulse 2s infinite;
-}
-
-.status.down .dot {
-  background: var(--red);
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5);
-  }
-  70% {
-    box-shadow: 0 0 0 7px rgba(63, 185, 80, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(63, 185, 80, 0);
-  }
-}
-
 /* --- Layout --------------------------------------------------------------- */
 
 main {
@@ -123,6 +84,13 @@ main {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  transition: max-width 0.18s ease, margin-right 0.18s ease;
+}
+
+body.preview-open main {
+  max-width: min(1040px, calc(100vw - var(--drawer-width) - 56px));
+  margin-right: var(--drawer-width);
+  margin-left: auto;
 }
 
 /* --- Dropzone ------------------------------------------------------------- */
@@ -260,6 +228,14 @@ tbody tr:last-child td {
 
 tbody tr:hover td {
   background: rgba(255, 255, 255, 0.02);
+}
+
+tbody tr[data-id]:has(.fname) {
+  cursor: pointer;
+}
+
+tbody tr.selected td {
+  background: rgba(109, 139, 255, 0.08);
 }
 
 td.name {
@@ -496,7 +472,7 @@ tr.empty td {
   position: fixed;
   top: 0;
   right: 0;
-  width: min(620px, 94vw);
+  width: var(--drawer-width);
   height: 100vh;
   background: var(--bg-elev);
   border-left: 1px solid var(--border);
