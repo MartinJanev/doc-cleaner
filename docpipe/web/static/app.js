@@ -1,6 +1,7 @@
 "use strict";
 
-const POLL_MS = 2000;
+const POLL_MS_ACTIVE = 2000;
+const POLL_MS_IDLE = 10000;
 const STEPS = ["Extract", "Refine", "Save"];
 // state -> number of completed steps (out of 3)
 const STEP_PROGRESS = {
@@ -210,15 +211,34 @@ function updateStats(documents) {
 
 // --- Data --------------------------------------------------------------------
 
+function hasWorkingDocuments(documents) {
+  return documents.some((doc) => WORKING_STATES.has(doc.state));
+}
+
 async function refresh() {
   try {
     const res = await fetch("/api/documents");
     if (!res.ok) throw new Error("bad status");
     const data = await res.json();
-    render(data.documents || []);
+    const documents = data.documents || [];
+    render(documents);
+    return hasWorkingDocuments(documents);
   } catch (err) {
     // Polling failed; next tick will retry.
+    return false;
   }
+}
+
+let pollTimer = null;
+
+function schedulePoll(hasWorking) {
+  if (pollTimer) clearTimeout(pollTimer);
+  if (document.hidden) return;
+  const ms = hasWorking ? POLL_MS_ACTIVE : POLL_MS_IDLE;
+  pollTimer = setTimeout(async () => {
+    const working = await refresh();
+    schedulePoll(working);
+  }, ms);
 }
 
 async function uploadFiles(files) {
@@ -234,7 +254,8 @@ async function uploadFiles(files) {
       toast(`${file.name}: ${err.message}`, "error");
     }
   }
-  refresh();
+  const working = await refresh();
+  schedulePoll(working);
 }
 
 async function manage(action, id, button) {
@@ -261,7 +282,8 @@ async function manage(action, id, button) {
     toast(err.message, "error");
   } finally {
     state.pending.delete(id);
-    await refresh();
+    const working = await refresh();
+    schedulePoll(working);
   }
 }
 
@@ -469,10 +491,12 @@ function bindEvents() {
 // --- Boot --------------------------------------------------------------------
 
 bindEvents();
-refresh();
-setInterval(() => {
-  if (!document.hidden) refresh();
-}, POLL_MS);
+refresh().then(schedulePoll);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) refresh();
+  if (document.hidden) {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    return;
+  }
+  refresh().then(schedulePoll);
 });

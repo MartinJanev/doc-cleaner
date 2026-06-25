@@ -12,6 +12,15 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Active Ollama model (pull first: ``ollama pull <tag>``).
+# Other choices suitable for doc cleanup + JSON metadata:
+#   "llama3"           - baseline, fast, weaker JSON
+#   "llama3.1:8b"      - solid upgrade, similar RAM
+#   "qwen2.5:7b"       - strong JSON + instructions, lighter RAM
+#   "qwen2.5:14b"      - best quality if you have 16 GB+ RAM
+#   "mistral-nemo:12b" - strong mid-size model (current choice)
+DOCPIPE_MODEL = "qwen2.5:14b"
+
 
 class Settings(BaseSettings):
     """Strongly-typed, validated pipeline settings."""
@@ -43,7 +52,7 @@ class Settings(BaseSettings):
         description="Base URL of the local Ollama server.",
     )
     model_tag: str = Field(
-        default="llama3",
+        default=DOCPIPE_MODEL,
         description="Ollama model used for the refining / metadata pass.",
     )
     llm_max_chars: int = Field(
@@ -65,7 +74,7 @@ class Settings(BaseSettings):
         "fit one chunk plus its cleaned output; raise it for bigger chunks.",
     )
     llm_timeout_s: int = Field(
-        default=180,
+        default=300,
         ge=1,
         description="Per-request timeout for the Ollama call, in seconds.",
     )

@@ -11,7 +11,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from docpipe.core.config import Settings
-from docpipe.core.logging import configure_logging, get_logger
+from docpipe.core.logging import (
+    configure_logging,
+    configure_uvicorn_access_logging,
+    get_logger,
+)
 from docpipe.pipeline.processor import DocumentProcessor
 from docpipe.services.extraction_service import ExtractionService
 from docpipe.services.llm_service import LLMService
@@ -122,6 +126,7 @@ def main() -> None:
     get_logger("docpipe.main").info(
         "web.serving", host=settings.web_host, port=settings.web_port
     )
+    configure_uvicorn_access_logging()
     uvicorn.run(app, host=settings.web_host, port=settings.web_port)
 
 

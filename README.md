@@ -76,8 +76,10 @@ The codebase is layered, dependency-injected, and single-responsibility. Concret
 Install [Ollama](https://ollama.com), make sure it's running, then pull the default model:
 
 ```bash
-ollama pull llama3
+ollama pull mistral-nemo:12b
 ```
+
+Other supported models are listed in `docpipe/core/config.py` (`DOCPIPE_MODEL`).
 
 **2. Install Python dependencies** (Python 3.11+):
 

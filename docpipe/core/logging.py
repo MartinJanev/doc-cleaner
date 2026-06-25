@@ -53,3 +53,15 @@ def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Return a bound structlog logger tagged with ``name``."""
     return structlog.get_logger(name)
+
+
+class _SkipDocumentsPollFilter(logging.Filter):
+    """Drop Uvicorn access-log lines for the UI status poll endpoint."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "GET /api/documents " not in record.getMessage()
+
+
+def configure_uvicorn_access_logging() -> None:
+    """Suppress noisy poll access logs while keeping other HTTP requests."""
+    logging.getLogger("uvicorn.access").addFilter(_SkipDocumentsPollFilter())
