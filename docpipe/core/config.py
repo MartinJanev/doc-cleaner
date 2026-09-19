@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Active Ollama model (pull first: ``ollama pull <tag>``).
@@ -143,6 +143,27 @@ class Settings(BaseSettings):
         else:
             return value
         return tuple(p.lower() if p.startswith(".") else f".{p.lower()}" for p in parts)
+
+    @model_validator(mode="after")
+    def _chunks_must_fit_the_context_window(self) -> "Settings":
+        """Refuse a chunk size the context window cannot hold.
+
+        The cleaning call sends one chunk and asks the model to echo a cleaned
+        version back, so the window has to hold both. At roughly four characters
+        per token that is ``chunk_chars / 2`` tokens. Getting this wrong does not
+        raise anywhere downstream — Ollama simply truncates the response, which
+        corrupts the output Markdown silently. Failing at startup is far kinder.
+        """
+        needed = self.llm_chunk_chars // 2
+        if needed > self.llm_num_ctx:
+            raise ValueError(
+                f"DOCPIPE_LLM_CHUNK_CHARS={self.llm_chunk_chars} needs about "
+                f"{needed} context tokens (one chunk in, one cleaned chunk out) "
+                f"but DOCPIPE_LLM_NUM_CTX is {self.llm_num_ctx}. Raise NUM_CTX to "
+                f"at least {needed}, or lower CHUNK_CHARS to "
+                f"{self.llm_num_ctx * 2}."
+            )
+        return self
 
     @property
     def markdown_dir(self) -> Path:

@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from docpipe.core.config import Settings
+from docpipe.core.exceptions import StorageError
 from docpipe.models.documents import ProcessingState
 from docpipe.storage.file_repository import FileRepository
 from docpipe.storage.state_store import JsonStateStore
@@ -148,16 +149,16 @@ def test_list_and_preview_completed(env) -> None:
     assert "Body text." in preview.text
 
 
-def test_resolve_stem_for_ledger_and_queued(env) -> None:
+def test_resolve_key_for_ledger_and_queued(env) -> None:
     file_hash = _seed_completed(env, name="report.pdf")
-    assert env["service"].resolve_stem(file_hash) == "report"
+    assert env["service"].resolve_key(file_hash) == "report"
 
     queued = env["settings"].input_dir / "fresh.pdf"
     queued.write_bytes(b"%PDF queued")
     queued_hash = env["repository"].compute_hash(queued)
-    assert env["service"].resolve_stem(queued_hash) == "fresh"
+    assert env["service"].resolve_key(queued_hash) == "fresh"
 
-    assert env["service"].resolve_stem("does-not-exist") is None
+    assert env["service"].resolve_key("does-not-exist") is None
 
 
 def test_download_endpoints_return_files(env) -> None:
@@ -211,3 +212,61 @@ def test_retry_missing_source_fails(env) -> None:
     res = env["client"].post("/api/documents/ghost/retry")
     assert res.status_code == 400
     assert env["submitted"] == []
+
+
+def test_upload_temp_file_is_invisible_to_the_watcher(env) -> None:
+    """The in-progress upload must not look like a processable input.
+
+    The temp file is created inside the watched directory. Giving it the real
+    suffix made the watcher enqueue a half-written file and surfaced a ghost
+    ".upload-XXXX" row in the UI.
+    """
+    import io
+
+    repository = env["repository"]
+    seen: list[list[str]] = []
+
+    class PeekingReader(io.BytesIO):
+        def read(self, size: int = -1) -> bytes:  # type: ignore[override]
+            seen.append([p.name for p in repository.iter_input_files()])
+            return super().read(size)
+
+    env["service"].save_upload_stream("doc.pdf", PeekingReader(b"%PDF-1.4 data"))
+
+    assert seen, "reader was never used"
+    assert all(names == [] for names in seen), f"temp file was visible: {seen}"
+    assert (env["settings"].input_dir / "doc.pdf").is_file()
+
+
+def test_nested_input_previews_and_downloads_its_own_output(env) -> None:
+    """Two same-named files in different folders must not share an output."""
+    settings, repository, state_store = (
+        env["settings"],
+        env["repository"],
+        env["state_store"],
+    )
+    hashes = {}
+    for year, body in (("2024", "old report"), ("2025", "new report")):
+        source = settings.input_dir / year / "report.pdf"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(f"%PDF-1.4 {year}".encode())
+        file_hash = repository.compute_hash(source)
+        state_store.start(file_hash, str(source))
+        state_store.mark(file_hash, ProcessingState.COMPLETED)
+        md_path, _ = repository.output_paths(repository.output_key(source))
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        md_path.write_text(f"# {body}", encoding="utf-8")
+        hashes[year] = file_hash
+
+    client = env["client"]
+    assert client.get(f"/api/documents/{hashes['2024']}/markdown").text == "# old report"
+    assert client.get(f"/api/documents/{hashes['2025']}/markdown").text == "# new report"
+    assert env["service"].resolve_key(hashes["2024"]) == "2024/report"
+
+
+def test_output_key_cannot_escape_the_output_directory(env) -> None:
+    """Defence in depth: keys are internal, but containment is still enforced."""
+    with pytest.raises(StorageError):
+        env["service"].read_markdown("../../etc/passwd")
+    with pytest.raises(StorageError):
+        env["service"].read_markdown("")

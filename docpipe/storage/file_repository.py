@@ -63,15 +63,38 @@ class FileRepository:
         return digest.hexdigest()
 
     # --- Output ------------------------------------------------------------
+    def output_key(self, source_path: Path) -> str:
+        """Return a document's output identity: its path relative to the input dir.
+
+        Inputs are enumerated recursively, so keying outputs by stem alone lets
+        ``input/2024/report.pdf`` and ``input/2025/report.pdf`` overwrite each
+        other. Mirroring the relative path keeps both, and keeps filenames
+        readable. Sources outside the input tree fall back to their bare name.
+        """
+        for candidate, root in (
+            (source_path, self._input_dir),
+            (source_path.resolve(), self._input_dir.resolve()),
+        ):
+            try:
+                return candidate.relative_to(root).with_suffix("").as_posix()
+            except ValueError:
+                continue
+        return Path(source_path.name).with_suffix("").as_posix()
+
+    def output_paths(self, key: str) -> tuple[Path, Path]:
+        """Return the (markdown, metadata) destinations for an output key."""
+        return self._markdown_dir / f"{key}.md", self._metadata_dir / f"{key}.json"
+
     def write_outputs(self, document: RestructuredDocument) -> tuple[Path, Path]:
         """Persist the refined Markdown and a metadata sidecar.
 
         Returns the (markdown_path, metadata_path) tuple.
         """
         self.ensure_directories()
-        stem = document.source_path.stem
-        md_path = self._markdown_dir / f"{stem}.md"
-        meta_path = self._metadata_dir / f"{stem}.json"
+        key = self.output_key(document.source_path)
+        md_path, meta_path = self.output_paths(key)
+        md_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             md_path.write_text(document.markdown_with_front_matter, encoding="utf-8")
@@ -85,6 +108,6 @@ class FileRepository:
                 encoding="utf-8",
             )
         except OSError as exc:
-            raise StorageError(f"Cannot write outputs for {stem}: {exc}") from exc
+            raise StorageError(f"Cannot write outputs for {key}: {exc}") from exc
 
         return md_path, meta_path

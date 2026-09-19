@@ -111,29 +111,29 @@ def create_app(
     return app
 
 
-def _resolve_stem(service: DocumentService, file_hash: str) -> str:
-    stem = service.resolve_stem(file_hash)
-    if stem is None:
+def _resolve_key(service: DocumentService, file_hash: str) -> str:
+    key = service.resolve_key(file_hash)
+    if key is None:
         raise HTTPException(status_code=404, detail="Document not found")
-    return stem
+    return key
 
 
 def _preview(service: DocumentService, file_hash: str, kind: str) -> str:
-    stem = _resolve_stem(service, file_hash)
+    key = _resolve_key(service, file_hash)
     try:
         if kind == "markdown":
-            return service.read_markdown(stem)
-        return service.read_metadata(stem)
+            return service.read_markdown(key)
+        return service.read_metadata(key)
     except StorageError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _download(service: DocumentService, file_hash: str, kind: str) -> FileResponse:
-    stem = _resolve_stem(service, file_hash)
+    key = _resolve_key(service, file_hash)
     path = (
-        service.markdown_path(stem)
+        service.markdown_path(key)
         if kind == "markdown"
-        else service.metadata_path(stem)
+        else service.metadata_path(key)
     )
     if path is None:
         raise HTTPException(status_code=404, detail=f"No {kind} output available")

@@ -56,9 +56,13 @@ States: `PENDING → EXTRACTED → RESTRUCTURED → COMPLETED`, or `FAILED`. The
 
 Ledger writes are atomic (`tempfile.mkstemp` + `fsync` + `os.replace`) under a re-entrant lock. Never write the state file directly; always go through `JsonStateStore`.
 
-### Hash vs. stem — the one asymmetry
+### Hash vs. output key — the one asymmetry
 
-Identity is the content hash, but **output filenames are keyed by the source stem** (`report.pdf` → `report.md` / `report.json`). Two different files with the same stem would clobber each other's outputs, so `DocumentService._unique_target` de-duplicates upload names (`report (1).pdf`) at ingest. Keep that invariant in mind when touching output paths or upload handling.
+Identity is the content hash, but **output filenames are keyed by the source's path relative to the input dir** — the *output key*. `report.pdf` → `report.md`; `2024/report.pdf` → `2024/report.md`. Inputs are enumerated recursively, so keying by bare stem let same-named files in different folders silently overwrite each other's outputs.
+
+`FileRepository.output_key(source)` and `FileRepository.output_paths(key)` are the **only** place this mapping lives — `write_outputs` and the whole web layer go through them. Never rebuild an output path from `settings.markdown_dir` by hand. `DocumentService._unique_target` still de-duplicates colliding upload names (`report (1).pdf`) at ingest, since uploads all land flat in the input root.
+
+Keys legitimately contain `/`, so containment against the output roots (`DocumentService._checked_paths`) replaces any separator denylist.
 
 ### Error boundary
 
@@ -87,10 +91,10 @@ All calls use Ollama's `format="json"` and go through `parse_llm_json`, which to
 
 ## Gotchas
 
-- **Default model differs across files.** The effective default is `DOCPIPE_MODEL = "qwen2.5:14b"` in `docpipe/core/config.py`; `README.md`, `.env.example`, `Dockerfile`, and `docker-compose.yml` all say `mistral-nemo:12b` via `DOCPIPE_MODEL_TAG`. Env always wins — check `config.py` for what actually runs, and update both sides if you change it.
-- `PROJECT_NOTES.md` and `.env.example` are listed in `.gitignore` and are untracked — edits to them will not show up in `git status`. (`.gitignore` also carries a now-dead `AGENTS.md` entry; that file was superseded by this one.)
+- **The model default lives in exactly one place**: `DOCPIPE_MODEL` in `docpipe/core/config.py`. `Dockerfile` and `docker-compose.yml` deliberately do **not** set `DOCPIPE_MODEL_TAG` so they cannot drift. `tests/test_config.py` fails if `.env.example` disagrees with the code, so change the constant and the test tells you what else to update.
+- `PROJECT_NOTES.md` is gitignored on purpose (it is the author's private notes) — edits to it will not show up in `git status`. `.env.example` **is** tracked, because the README links to it.
 - Keep `DOCPIPE_MAX_WORKERS` at 1 unless there is memory headroom; Docling and Ollama are both memory-hungry and share the machine.
-- `DOCPIPE_LLM_NUM_CTX` must comfortably fit one chunk plus its cleaned output. Raising `DOCPIPE_LLM_CHUNK_CHARS` without raising `NUM_CTX` silently truncates model output.
+- `DOCPIPE_LLM_NUM_CTX` must fit one chunk plus its cleaned output. Raising `DOCPIPE_LLM_CHUNK_CHARS` without raising `NUM_CTX` used to truncate model output silently; a `model_validator` on `Settings` now refuses to start instead. Keep that guard in sync if the chunking strategy changes.
 - The web UI bundles its own Markdown renderer (`web/static/markdown.js`) to stay fully offline — do not introduce a CDN dependency.
 
 ## Repo rules (always active)

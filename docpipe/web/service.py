@@ -81,14 +81,14 @@ class DocumentService:
                 return document
         return None
 
-    def resolve_stem(self, file_hash: str) -> Optional[str]:
-        """Return the output stem for a hash without building the full list.
+    def resolve_key(self, file_hash: str) -> Optional[str]:
+        """Return the output key for a hash without building the full list.
 
         Resolves via the ledger first, then a cached scan of the input dir, so
         preview/download routes avoid re-hashing every input on each request.
         """
         path = self._resolve_source(file_hash)
-        return path.stem if path is not None else None
+        return self._repository.output_key(path) if path is not None else None
 
     # --- Upload ------------------------------------------------------------
     def save_upload(self, filename: str, data: bytes) -> dict[str, Any]:
@@ -131,7 +131,7 @@ class DocumentService:
         total = 0
         try:
             fd, tmp_name = tempfile.mkstemp(
-                dir=str(input_dir), prefix=".upload-", suffix=suffix
+                dir=str(input_dir), prefix=".upload-", suffix=".part"
             )
             try:
                 with os.fdopen(fd, "wb") as handle:
@@ -159,21 +159,21 @@ class DocumentService:
 
         logger.info("web.upload", filename=target.name, bytes=total)
         self._enqueue(target)
-        return {"filename": target.name, "stem": target.stem}
+        return {"filename": target.name, "key": target.stem}
 
     # --- Output access -----------------------------------------------------
-    def read_markdown(self, stem: str) -> str:
-        return self._read_text(self._markdown_path(self._safe_stem(stem)))
+    def read_markdown(self, key: str) -> str:
+        return self._read_text(self._checked_paths(key)[0])
 
-    def read_metadata(self, stem: str) -> str:
-        return self._read_text(self._metadata_path(self._safe_stem(stem)))
+    def read_metadata(self, key: str) -> str:
+        return self._read_text(self._checked_paths(key)[1])
 
-    def markdown_path(self, stem: str) -> Optional[Path]:
-        path = self._markdown_path(self._safe_stem(stem))
+    def markdown_path(self, key: str) -> Optional[Path]:
+        path = self._checked_paths(key)[0]
         return path if path.is_file() else None
 
-    def metadata_path(self, stem: str) -> Optional[Path]:
-        path = self._metadata_path(self._safe_stem(stem))
+    def metadata_path(self, key: str) -> Optional[Path]:
+        path = self._checked_paths(key)[1]
         return path if path.is_file() else None
 
     # --- Management --------------------------------------------------------
@@ -199,12 +199,13 @@ class DocumentService:
         removed: list[str] = []
 
         if path is not None:
-            stem = path.stem
             if path.is_file():
                 path.unlink(missing_ok=True)
                 self._invalidate_hash(path)
                 removed.append(str(path))
-            for output in (self._markdown_path(stem), self._metadata_path(stem)):
+            for output in self._repository.output_paths(
+                self._repository.output_key(path)
+            ):
                 if output.is_file():
                     output.unlink(missing_ok=True)
                     removed.append(str(output))
@@ -236,46 +237,57 @@ class DocumentService:
         return None
 
     def _record_to_dict(self, file_hash: str, record: DocumentRecord) -> dict[str, Any]:
-        stem = Path(record.source_path).stem
+        source = Path(record.source_path)
+        md_path, meta_path = self._repository.output_paths(
+            self._repository.output_key(source)
+        )
         return {
             "id": file_hash,
-            "name": Path(record.source_path).name,
-            "stem": stem,
+            "name": source.name,
+            "key": self._repository.output_key(source),
             "state": record.state.value,
             "attempts": record.attempts,
             "error": record.error,
             "created_at": record.created_at,
             "updated_at": record.updated_at,
-            "has_markdown": self._markdown_path(stem).is_file(),
-            "has_metadata": self._metadata_path(stem).is_file(),
+            "has_markdown": md_path.is_file(),
+            "has_metadata": meta_path.is_file(),
         }
 
     def _queued_to_dict(self, file_hash: str, path: Path) -> dict[str, Any]:
+        key = self._repository.output_key(path)
+        md_path, meta_path = self._repository.output_paths(key)
         return {
             "id": file_hash,
             "name": path.name,
-            "stem": path.stem,
+            "key": key,
             "state": QUEUED,
             "attempts": 0,
             "error": None,
             "created_at": None,
             "updated_at": None,
-            "has_markdown": self._markdown_path(path.stem).is_file(),
-            "has_metadata": self._metadata_path(path.stem).is_file(),
+            "has_markdown": md_path.is_file(),
+            "has_metadata": meta_path.is_file(),
         }
 
-    def _markdown_path(self, stem: str) -> Path:
-        return self._settings.markdown_dir / f"{stem}.md"
+    def _checked_paths(self, key: str) -> tuple[Path, Path]:
+        """Resolve an output key to its paths, refusing directory escapes.
 
-    def _metadata_path(self, stem: str) -> Path:
-        return self._settings.metadata_dir / f"{stem}.json"
-
-    @staticmethod
-    def _safe_stem(stem: str) -> str:
-        """Reject stems that could escape the output directories."""
-        if not stem or stem in {".", ".."} or set(stem) & set("/\\"):
-            raise StorageError(f"Invalid document name: {stem!r}")
-        return stem
+        Keys are derived internally from filesystem paths, so this is defence in
+        depth for the preview/download routes. Keys legitimately contain "/" now
+        that outputs mirror the input tree, so containment is checked against the
+        output roots rather than by banning separators.
+        """
+        md_path, meta_path = self._repository.output_paths(key)
+        pairs = (
+            (md_path, self._settings.markdown_dir),
+            (meta_path, self._settings.metadata_dir),
+        )
+        if not key or any(
+            not path.resolve().is_relative_to(root.resolve()) for path, root in pairs
+        ):
+            raise StorageError(f"Invalid document key: {key!r}")
+        return md_path, meta_path
 
     @staticmethod
     def _read_text(path: Path) -> str:

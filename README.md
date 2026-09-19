@@ -49,6 +49,8 @@ For an input file named `report.pdf`, doc-cleaner writes two files:
 - `data/output/markdown/report.md` — cleaned Markdown with a YAML front-matter header.
 - `data/output/metadata/report.json` — structured metadata (plus the source filename and content hash).
 
+Subfolders are mirrored, so `data/input/2024/report.pdf` writes to `data/output/markdown/2024/report.md`. Two files with the same name in different folders keep separate outputs.
+
 ## Architecture
 
 The codebase is layered, dependency-injected, and single-responsibility. Concrete classes are wired together in one place (`docpipe/main.py`); everything else receives its collaborators through constructors.

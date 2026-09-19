@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from docpipe.core.config import Settings
 
 _ENV_EXAMPLE = Path(__file__).resolve().parents[1] / ".env.example"
@@ -40,3 +42,23 @@ def test_suffixes_accept_comma_separated_env_string() -> None:
         ".pdf",
         ".docx",
     )
+
+
+def test_chunk_chars_must_fit_the_context_window() -> None:
+    """A chunk bigger than num_ctx truncates model output with no error.
+
+    Ollama silently cuts the response short, so the corruption only shows up in
+    the written Markdown. Failing at startup is the whole point of this guard.
+    """
+    with pytest.raises(ValueError, match="DOCPIPE_LLM_NUM_CTX"):
+        Settings(llm_chunk_chars=30_000, llm_num_ctx=8_192)
+
+
+def test_compatible_chunk_and_context_sizes_are_accepted() -> None:
+    settings = Settings(llm_chunk_chars=30_000, llm_num_ctx=16_384)
+    assert settings.llm_chunk_chars == 30_000
+
+
+def test_defaults_are_self_consistent() -> None:
+    """The shipped defaults must satisfy the guard they enforce."""
+    assert Settings().llm_chunk_chars // 2 <= Settings().llm_num_ctx

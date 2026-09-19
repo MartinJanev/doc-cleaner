@@ -76,3 +76,41 @@ def test_write_outputs_routes_md_and_metadata(tmp_path: Path) -> None:
     assert meta["source_file"] == "report.pdf"
     assert meta["file_hash"] == "abc123"
     assert meta["tags"] == ["finance", "q1"]
+
+
+def test_nested_inputs_mirror_into_nested_outputs(tmp_path: Path) -> None:
+    """Outputs mirror the input tree so same-named files cannot collide.
+
+    Inputs are enumerated recursively, so keying outputs by stem alone let
+    input/2024/report.pdf and input/2025/report.pdf overwrite each other.
+    """
+    repository = _make_repo(tmp_path)
+    repository.ensure_directories()
+
+    for year, body in (("2024", "old"), ("2025", "new")):
+        source = tmp_path / "input" / year / "report.pdf"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(b"pdf")
+        repository.write_outputs(
+            RestructuredDocument(
+                source_path=source,
+                file_hash=f"hash-{year}",
+                metadata=DocumentMetadata(title=body, summary="", author="", tags=[]),
+                markdown_with_front_matter=f"# {body}\n",
+            )
+        )
+
+    markdown_dir = tmp_path / "out" / "markdown"
+    assert (markdown_dir / "2024" / "report.md").read_text() == "# old\n"
+    assert (markdown_dir / "2025" / "report.md").read_text() == "# new\n"
+    assert not (markdown_dir / "report.md").exists()
+
+
+def test_output_key_mirrors_relative_path_and_falls_back_to_the_name(
+    tmp_path: Path,
+) -> None:
+    repository = _make_repo(tmp_path)
+    assert repository.output_key(tmp_path / "input" / "a" / "b" / "report.pdf") == "a/b/report"
+    assert repository.output_key(tmp_path / "input" / "report.pdf") == "report"
+    # A source outside the watched tree still gets a usable, flat key.
+    assert repository.output_key(Path("/elsewhere/report.pdf")) == "report"
