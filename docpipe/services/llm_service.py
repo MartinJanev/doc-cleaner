@@ -7,7 +7,7 @@ raw ``MarkdownDocument`` into a ``RestructuredDocument`` with YAML front matter.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from docpipe.core.exceptions import LLMServiceError
 from docpipe.core.logging import get_logger
@@ -39,7 +39,7 @@ class LLMService:
 
     def __init__(
         self,
-        client: "Client",
+        client: Client,
         model: str,
         max_chars: int,
         chunk_chars: int,
@@ -53,7 +53,7 @@ class LLMService:
         self._num_ctx = num_ctx
         self._temperature = temperature
 
-    def preflight(self) -> Optional[str]:
+    def preflight(self) -> str | None:
         """Check that Ollama is reachable and the configured model is pulled.
 
         Returns ``None`` when everything is ready, otherwise a human-readable
@@ -85,10 +85,18 @@ class LLMService:
         newer ones; both shapes are accepted. A bare name is matched as
         ``name:latest`` too, which is how Ollama stores an untagged pull.
         """
-        models = listed.get("models") if isinstance(listed, dict) else getattr(listed, "models", [])
+        models = (
+            listed.get("models")
+            if isinstance(listed, dict)
+            else getattr(listed, "models", [])
+        )
         names: set[str] = set()
         for entry in models or []:
-            name = entry.get("model") if isinstance(entry, dict) else getattr(entry, "model", None)
+            name = (
+                entry.get("model")
+                if isinstance(entry, dict)
+                else getattr(entry, "model", None)
+            )
             if not name:
                 continue
             names.add(str(name))
@@ -145,9 +153,7 @@ class LLMService:
             markdown_with_front_matter=f"{front_matter}{cleaned_body}\n",
         )
 
-    def _clean_in_chunks(
-        self, markdown: str, document: MarkdownDocument
-    ) -> str:
+    def _clean_in_chunks(self, markdown: str, document: MarkdownDocument) -> str:
         """Clean a large document one fragment at a time and reassemble it."""
         chunks = chunk_markdown(markdown, self._chunk_chars)
         logger.info(
@@ -196,21 +202,22 @@ class LLMService:
             return parse_llm_json(content)
         except ValueError as exc:
             raise LLMServiceError(
-                f"Could not parse LLM response for "
-                f"{document.source_path.name}: {exc}"
+                f"Could not parse LLM response for {document.source_path.name}: {exc}"
             ) from exc
 
     @staticmethod
     def _extract_content(response: Any) -> str:
         """Pull the assistant message text from an Ollama chat response."""
         try:
-            message = response["message"] if isinstance(response, dict) else response.message
+            message = (
+                response["message"] if isinstance(response, dict) else response.message
+            )
             content = message["content"] if isinstance(message, dict) else message.content
         except (KeyError, AttributeError, TypeError) as exc:
             raise LLMServiceError(f"Unexpected Ollama response shape: {exc}") from exc
         if not content:
             raise LLMServiceError("Ollama returned an empty message")
-        return content
+        return str(content)
 
     @staticmethod
     def _to_metadata(parsed: dict[str, Any]) -> DocumentMetadata:

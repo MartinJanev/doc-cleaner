@@ -1,5 +1,11 @@
 # doc-cleaner
 
+[![CI](https://github.com/martinjanev/doc-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/martinjanev/doc-cleaner/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Checked with mypy](https://img.shields.io/badge/mypy-strict-blue)](https://mypy-lang.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 Turn messy PDFs and Word documents into clean, LLM-ready Markdown — entirely on your own machine.
 
 doc-cleaner watches a folder, and whenever you drop in a `.pdf` or `.docx`, it:
@@ -155,13 +161,26 @@ Docling and Ollama are both memory-hungry, and running them side by side on one 
 - Long documents are **cleaned in chunks** rather than truncated: anything larger than `DOCPIPE_LLM_CHUNK_CHARS` is refined fragment by fragment, then analyzed for metadata in a final pass. This keeps multi-page files from being cut off. Larger chunks need a larger `DOCPIPE_LLM_NUM_CTX` (the Ollama context window) and more RAM.
 - Files that are still being copied in are debounced and size-checked before processing, so partial files won't be picked up.
 
-## Tests
+## Development
 
-The pure-logic units (ledger, file routing, prompts) run without Docling or Ollama:
+The test suite covers the ledger, file routing, prompts, the LLM stage and the
+processor — all with fakes, so it needs neither Docling nor Ollama and runs in
+well under a second:
 
 ```bash
-pytest -q
+pip install -r requirements-test.txt && pip install --no-deps -e .
+pytest
 ```
+
+The full gate, which is what CI runs:
+
+```bash
+ruff check . && ruff format --check . && mypy && pytest
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the house rules, and
+[SECURITY.md](SECURITY.md) for the threat model before you expose the web UI to
+anything beyond localhost.
 
 ## License
 

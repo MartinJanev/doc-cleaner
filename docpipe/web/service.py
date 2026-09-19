@@ -13,7 +13,7 @@ import os
 import tempfile
 import threading
 from pathlib import Path
-from typing import Any, BinaryIO, Optional
+from typing import Any, BinaryIO
 
 from docpipe.core.config import Settings
 from docpipe.core.exceptions import StorageError, UploadTooLargeError
@@ -36,7 +36,7 @@ class DocumentService:
         settings: Settings,
         repository: FileRepository,
         state_store: JsonStateStore,
-        submit_job: "Optional[Any]" = None,
+        submit_job: Any | None = None,
     ) -> None:
         self._settings = settings
         self._repository = repository
@@ -75,13 +75,13 @@ class DocumentService:
         documents.sort(key=lambda doc: doc.get("updated_at") or "", reverse=True)
         return documents
 
-    def get_document(self, file_hash: str) -> Optional[dict[str, Any]]:
+    def get_document(self, file_hash: str) -> dict[str, Any] | None:
         for document in self.list_documents():
             if document["id"] == file_hash:
                 return document
         return None
 
-    def resolve_key(self, file_hash: str) -> Optional[str]:
+    def resolve_key(self, file_hash: str) -> str | None:
         """Return the output key for a hash without building the full list.
 
         Resolves via the ledger first, then a cached scan of the input dir, so
@@ -91,17 +91,11 @@ class DocumentService:
         return self._repository.output_key(path) if path is not None else None
 
     # --- Upload ------------------------------------------------------------
-    def save_upload(self, filename: str, data: bytes) -> dict[str, Any]:
-        """Persist an in-memory upload. Convenience wrapper over the streamer."""
-        import io
-
-        return self.save_upload_stream(filename, io.BytesIO(data))
-
     def save_upload_stream(
         self,
         filename: str,
         reader: BinaryIO,
-        max_bytes: Optional[int] = None,
+        max_bytes: int | None = None,
     ) -> dict[str, Any]:
         """Stream an upload to the input directory atomically.
 
@@ -168,11 +162,11 @@ class DocumentService:
     def read_metadata(self, key: str) -> str:
         return self._read_text(self._checked_paths(key)[1])
 
-    def markdown_path(self, key: str) -> Optional[Path]:
+    def markdown_path(self, key: str) -> Path | None:
         path = self._checked_paths(key)[0]
         return path if path.is_file() else None
 
-    def metadata_path(self, key: str) -> Optional[Path]:
+    def metadata_path(self, key: str) -> Path | None:
         path = self._checked_paths(key)[1]
         return path if path.is_file() else None
 
@@ -181,9 +175,7 @@ class DocumentService:
         """Clear a document's ledger entry and re-enqueue its source file."""
         path = self._resolve_source(file_hash)
         if path is None or not path.is_file():
-            raise StorageError(
-                "Source file is no longer available; cannot reprocess."
-            )
+            raise StorageError("Source file is no longer available; cannot reprocess.")
         self._state.delete(file_hash)
         self._invalidate_hash(path)
         self._enqueue(path)
@@ -224,7 +216,7 @@ class DocumentService:
             except Exception as exc:  # never let UI actions crash on the queue
                 logger.error("web.enqueue.failed", path=str(path), error=repr(exc))
 
-    def _resolve_source(self, file_hash: str) -> Optional[Path]:
+    def _resolve_source(self, file_hash: str) -> Path | None:
         record = self._state.get(file_hash)
         if record is not None:
             return Path(record.source_path)

@@ -1,0 +1,17 @@
+# Dependencies needed to run the test suite, and nothing more.
+#
+# docling and ollama are deliberately absent. The pipeline imports both lazily
+# (inside main.build_components, or under `if TYPE_CHECKING:`) so the pure-logic
+# tests never touch a model library. Installing the package with --no-deps plus
+# this file therefore *enforces* that convention: a stray top-level
+# `import docling` fails CI immediately instead of quietly slowing every run.
+#
+# For real use, install the package itself: `pip install -e ".[dev]"`.
+pytest>=7.4
+httpx>=0.27
+fastapi>=0.110,<1
+python-multipart>=0.0.9,<1
+pydantic>=2.6,<3
+pydantic-settings>=2.2,<3
+structlog>=24.1,<27
+watchdog>=4,<7

@@ -63,7 +63,7 @@ def test_write_outputs_routes_md_and_metadata(tmp_path: Path) -> None:
             author="Jane",
             tags=["finance", "q1"],
         ),
-        markdown_with_front_matter="---\ntitle: \"Report\"\n---\n# Body\n",
+        markdown_with_front_matter='---\ntitle: "Report"\n---\n# Body\n',
     )
     md_path, meta_path = repo.write_outputs(document)
 
@@ -110,7 +110,8 @@ def test_output_key_mirrors_relative_path_and_falls_back_to_the_name(
     tmp_path: Path,
 ) -> None:
     repository = _make_repo(tmp_path)
-    assert repository.output_key(tmp_path / "input" / "a" / "b" / "report.pdf") == "a/b/report"
+    nested = tmp_path / "input" / "a" / "b" / "report.pdf"
+    assert repository.output_key(nested) == "a/b/report"
     assert repository.output_key(tmp_path / "input" / "report.pdf") == "report"
     # A source outside the watched tree still gets a usable, flat key.
     assert repository.output_key(Path("/elsewhere/report.pdf")) == "report"

@@ -1,0 +1,31 @@
+name: Bug report
+description: Something does not work the way the docs say it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: >
+        Run with DOCPIPE_LOG_JSON=false for readable logs. Please include the
+        boot.config and boot.preflight lines.
+      render: shell
+  - type: input
+    id: model
+    attributes:
+      label: Ollama model
+      placeholder: "qwen2.5:14b"
+  - type: input
+    id: version
+    attributes:
+      label: How are you running it?
+      placeholder: "pip install -e . on Python 3.11 / macOS, or docker compose"
+    validations:
+      required: true

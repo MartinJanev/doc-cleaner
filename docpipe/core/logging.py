@@ -50,9 +50,15 @@ def configure_logging(level: str = "INFO", json_logs: bool = True) -> None:
     )
 
 
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    """Return a bound structlog logger tagged with ``name``."""
-    return structlog.get_logger(name)
+def get_logger(name: str) -> structlog.typing.FilteringBoundLogger:
+    """Return a bound structlog logger tagged with ``name``.
+
+    The configured factory is ``PrintLoggerFactory`` wrapped by
+    ``make_filtering_bound_logger``, so this is the accurate type -- not
+    ``structlog.stdlib.BoundLogger``, which this pipeline never produces.
+    """
+    logger: structlog.typing.FilteringBoundLogger = structlog.get_logger(name)
+    return logger
 
 
 class _SkipDocumentsPollFilter(logging.Filter):

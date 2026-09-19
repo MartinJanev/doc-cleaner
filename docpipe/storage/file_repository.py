@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from docpipe.core.exceptions import StorageError
 from docpipe.models.documents import RestructuredDocument

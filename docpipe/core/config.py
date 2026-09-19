@@ -145,7 +145,7 @@ class Settings(BaseSettings):
         return tuple(p.lower() if p.startswith(".") else f".{p.lower()}" for p in parts)
 
     @model_validator(mode="after")
-    def _chunks_must_fit_the_context_window(self) -> "Settings":
+    def _chunks_must_fit_the_context_window(self) -> Settings:
         """Refuse a chunk size the context window cannot hold.
 
         The cleaning call sends one chunk and asks the model to echo a cleaned

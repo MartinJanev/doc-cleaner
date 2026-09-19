@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 class ExtractionService:
     """Converts a source document into layout-faithful Markdown."""
 
-    def __init__(self, converter: "DocumentConverter") -> None:
+    def __init__(self, converter: DocumentConverter) -> None:
         self._converter = converter
 
     def extract(self, path: Path, file_hash: str) -> MarkdownDocument:

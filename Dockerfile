@@ -17,8 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Install from the compiled lock so image builds are byte-for-byte repeatable.
+COPY requirements.lock .
+RUN pip install --upgrade pip && pip install -r requirements.lock
 
 # ---------- Stage 2: runtime ----------
 FROM python:3.11-slim AS runtime

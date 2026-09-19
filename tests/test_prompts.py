@@ -84,7 +84,7 @@ def test_render_front_matter_quotes_and_lists() -> None:
     assert fm.startswith("---\n")
     assert fm.rstrip().endswith("---")
     assert 'title: "Quarterly \\"Report\\""' in fm
-    assert "tags: [\"finance\", \"q1\"]" in fm
+    assert 'tags: ["finance", "q1"]' in fm
     assert 'source_file: "report.pdf"' in fm
     # newlines collapsed to keep YAML single-line scalars valid
     assert "Line one line two" in fm

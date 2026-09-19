@@ -9,8 +9,8 @@ hand a half-written file to Docling.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from watchdog.events import (
     FileCreatedEvent,

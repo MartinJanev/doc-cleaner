@@ -9,9 +9,10 @@ UI and runs the pipeline.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -22,6 +23,9 @@ from docpipe.core.exceptions import PipelineError, StorageError, UploadTooLargeE
 from docpipe.core.logging import get_logger
 from docpipe.web.service import DocumentService
 
+if TYPE_CHECKING:  # the web layer must not import the watcher at runtime
+    from docpipe.watcher.runner import WatcherRunner
+
 logger = get_logger(__name__)
 
 _STATIC_DIR = Path(__file__).parent / "static"
@@ -29,12 +33,12 @@ _STATIC_DIR = Path(__file__).parent / "static"
 
 def create_app(
     service: DocumentService,
-    runner: "Optional[object]" = None,
+    runner: WatcherRunner | None = None,
 ) -> FastAPI:
     """Build the FastAPI app around a service (and optional watcher runner)."""
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI):
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if runner is not None:
             logger.info("web.lifespan.start_watcher")
             runner.start_background()
@@ -131,16 +135,14 @@ def _preview(service: DocumentService, file_hash: str, kind: str) -> str:
 def _download(service: DocumentService, file_hash: str, kind: str) -> FileResponse:
     key = _resolve_key(service, file_hash)
     path = (
-        service.markdown_path(key)
-        if kind == "markdown"
-        else service.metadata_path(key)
+        service.markdown_path(key) if kind == "markdown" else service.metadata_path(key)
     )
     if path is None:
         raise HTTPException(status_code=404, detail=f"No {kind} output available")
     return FileResponse(path=str(path), filename=path.name)
 
 
-def _manage(action, file_hash: str) -> dict[str, object]:
+def _manage(action: Callable[[str], dict[str, Any]], file_hash: str) -> dict[str, object]:
     try:
         return action(file_hash)
     except StorageError as exc:

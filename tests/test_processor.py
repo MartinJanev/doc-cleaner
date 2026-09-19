@@ -48,7 +48,7 @@ class FakeLLM:
             source_path=document.source_path,
             file_hash=document.file_hash,
             metadata=DocumentMetadata(title="T", summary="S", author="A", tags=["t"]),
-            markdown_with_front_matter="---\ntitle: \"T\"\n---\n\n# Clean\n",
+            markdown_with_front_matter='---\ntitle: "T"\n---\n\n# Clean\n',
         )
 
 

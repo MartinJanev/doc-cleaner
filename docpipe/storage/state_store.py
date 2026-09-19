@@ -15,12 +15,10 @@ import json
 import os
 import tempfile
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from docpipe.core.exceptions import StorageError
-from docpipe.models.documents import DocumentRecord, ProcessingState
+from docpipe.models.documents import DocumentRecord, ProcessingState, utc_now
 
 
 class JsonStateStore:
@@ -67,7 +65,7 @@ class JsonStateStore:
             raise StorageError(f"Cannot write state file {self._path}: {exc}") from exc
 
     # --- Queries -----------------------------------------------------------
-    def get(self, file_hash: str) -> Optional[DocumentRecord]:
+    def get(self, file_hash: str) -> DocumentRecord | None:
         with self._lock:
             return self._records.get(file_hash)
 
@@ -98,13 +96,6 @@ class JsonStateStore:
             return True
 
     # --- Mutations ---------------------------------------------------------
-    def upsert(self, record: DocumentRecord) -> DocumentRecord:
-        with self._lock:
-            record.updated_at = _utc_now()
-            self._records[record.file_hash] = record
-            self._flush()
-            return record
-
     def start(self, file_hash: str, source_path: str) -> DocumentRecord:
         """Create or reset a record to PENDING, incrementing the attempt count."""
         with self._lock:
@@ -115,7 +106,7 @@ class JsonStateStore:
             record.state = ProcessingState.PENDING
             record.attempts += 1
             record.error = None
-            record.updated_at = _utc_now()
+            record.updated_at = utc_now()
             self._records[file_hash] = record
             self._flush()
             return record
@@ -124,7 +115,7 @@ class JsonStateStore:
         self,
         file_hash: str,
         state: ProcessingState,
-        error: Optional[str] = None,
+        error: str | None = None,
     ) -> DocumentRecord:
         with self._lock:
             record = self._records.get(file_hash)
@@ -132,7 +123,7 @@ class JsonStateStore:
                 raise StorageError(f"No ledger record for hash {file_hash}")
             record.state = state
             record.error = error
-            record.updated_at = _utc_now()
+            record.updated_at = utc_now()
             self._flush()
             return record
 
@@ -148,7 +139,3 @@ class JsonStateStore:
             del self._records[file_hash]
             self._flush()
             return True
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()

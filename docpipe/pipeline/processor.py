@@ -9,7 +9,6 @@ boundary so one bad file never takes down the daemon.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from docpipe.core.exceptions import PipelineError
 from docpipe.core.logging import get_logger
@@ -39,7 +38,7 @@ class DocumentProcessor:
         self._state = state_store
         self._max_attempts = max_attempts
 
-    def process(self, path: Path) -> Optional[RestructuredDocument]:
+    def process(self, path: Path) -> RestructuredDocument | None:
         """Process a single document, returning the artifact or None on skip/fail.
 
         Idempotent: a file whose content hash is already COMPLETED is skipped.

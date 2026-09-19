@@ -154,9 +154,10 @@ def parse_llm_json(content: str) -> dict[str, Any]:
     if candidate is None:
         raise ValueError("No JSON object found in LLM response")
     try:
-        return json.loads(candidate)
+        parsed: dict[str, Any] = json.loads(candidate)
     except json.JSONDecodeError as exc:
         raise ValueError(f"LLM response was not valid JSON: {exc}") from exc
+    return parsed
 
 
 def _extract_braced(text: str) -> str | None:

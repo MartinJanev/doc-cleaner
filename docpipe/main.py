@@ -98,11 +98,6 @@ def build_components(settings: Settings) -> Components:
     )
 
 
-def build_runner(settings: Settings) -> WatcherRunner:
-    """Wire up every dependency and return a ready-to-start runner."""
-    return build_components(settings).runner
-
-
 def main() -> None:
     settings = Settings()
     configure_logging(level=settings.log_level, json_logs=settings.log_json)

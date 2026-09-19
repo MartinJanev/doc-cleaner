@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import queue
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from docpipe.core.logging import get_logger
 
@@ -30,7 +30,7 @@ class JobQueue:
     ) -> None:
         self._handler = handler
         self._max_workers = max_workers
-        self._queue: "queue.Queue[Path | None]" = queue.Queue()
+        self._queue: queue.Queue[Path | None] = queue.Queue()
         self._in_flight: set[str] = set()
         self._lock = threading.Lock()
         self._workers: list[threading.Thread] = []
@@ -72,7 +72,9 @@ class JobQueue:
                 try:
                     self._handler(item)
                 except Exception as exc:  # handler is expected to self-contain
-                    logger.error("jobqueue.handler_error", path=str(item), error=repr(exc))
+                    logger.error(
+                        "jobqueue.handler_error", path=str(item), error=repr(exc)
+                    )
                 finally:
                     with self._lock:
                         self._in_flight.discard(str(item))

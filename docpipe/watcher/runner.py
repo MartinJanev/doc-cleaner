@@ -9,6 +9,7 @@ Owns the lifecycle of the daemon:
 
 from __future__ import annotations
 
+import contextlib
 import signal
 import threading
 from pathlib import Path
@@ -91,11 +92,9 @@ class WatcherRunner:
             self._stop_event.set()
 
         for sig in (signal.SIGINT, signal.SIGTERM):
-            try:
+            # ValueError means we are not on the main thread (e.g. under test).
+            with contextlib.suppress(ValueError):
                 signal.signal(sig, _handle)
-            except ValueError:
-                # Not on the main thread (e.g. under test); skip.
-                pass
 
     def _shutdown(self) -> None:
         logger.info("runner.shutdown.start")

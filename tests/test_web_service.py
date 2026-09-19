@@ -85,7 +85,8 @@ def test_upload_lands_complete_file(env) -> None:
     assert saved.is_file()
     assert saved.read_bytes() == b"%PDF-1.4 data"
     # no leftover temp files
-    assert not any(p.name.startswith(".upload-") for p in env["settings"].input_dir.iterdir())
+    leftovers = list(env["settings"].input_dir.iterdir())
+    assert not any(p.name.startswith(".upload-") for p in leftovers)
 
 
 def test_upload_rejects_unsupported_type(env) -> None:

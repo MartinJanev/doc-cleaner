@@ -8,13 +8,13 @@ in service dependencies.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
-class ProcessingState(str, Enum):
+class ProcessingState(StrEnum):
     """Lifecycle states recorded in the ledger for each document."""
 
     PENDING = "PENDING"
@@ -24,9 +24,9 @@ class ProcessingState(str, Enum):
     FAILED = "FAILED"
 
 
-def _utc_now() -> str:
-    """ISO-8601 UTC timestamp string."""
-    return datetime.now(timezone.utc).isoformat()
+def utc_now() -> str:
+    """ISO-8601 UTC timestamp string. Shared by the models and the ledger."""
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass(frozen=True)
@@ -69,9 +69,9 @@ class DocumentRecord:
     source_path: str
     state: ProcessingState = ProcessingState.PENDING
     attempts: int = 0
-    error: Optional[str] = None
-    created_at: str = field(default_factory=_utc_now)
-    updated_at: str = field(default_factory=_utc_now)
+    error: str | None = None
+    created_at: str = field(default_factory=utc_now)
+    updated_at: str = field(default_factory=utc_now)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -79,13 +79,13 @@ class DocumentRecord:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DocumentRecord":
+    def from_dict(cls, data: dict[str, Any]) -> DocumentRecord:
         return cls(
             file_hash=data["file_hash"],
             source_path=data["source_path"],
             state=ProcessingState(data.get("state", ProcessingState.PENDING.value)),
             attempts=int(data.get("attempts", 0)),
             error=data.get("error"),
-            created_at=data.get("created_at", _utc_now()),
-            updated_at=data.get("updated_at", _utc_now()),
+            created_at=data.get("created_at", utc_now()),
+            updated_at=data.get("updated_at", utc_now()),
         )

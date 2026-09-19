@@ -69,7 +69,8 @@ def test_preflight_accepts_the_newer_object_response_shape() -> None:
         model = "test-model"
 
     class Listed:
-        models = [Entry()]
+        def __init__(self) -> None:
+            self.models = [Entry()]
 
     assert build_service(FakeClient([], listed=Listed())).preflight() is None
 
@@ -120,9 +121,7 @@ def test_small_document_uses_a_single_pass() -> None:
 def test_large_document_cleans_in_chunks_then_derives_metadata() -> None:
     markdown = "\n\n".join(f"Block {i} {'x' * 60}" for i in range(10))
     cleans = [json.dumps({"markdown": f"cleaned-{i}"}) for i in range(5)]
-    metadata = json.dumps(
-        {"title": "T", "summary": "S", "author": "A", "tags": ["one"]}
-    )
+    metadata = json.dumps({"title": "T", "summary": "S", "author": "A", "tags": ["one"]})
     client = FakeClient([*cleans, metadata])
 
     result = build_service(client, chunk_chars=200).refine(document(markdown))
