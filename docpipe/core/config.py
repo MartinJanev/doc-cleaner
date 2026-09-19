@@ -102,6 +102,19 @@ class Settings(BaseSettings):
         description="File extensions the pipeline will process.",
     )
 
+    # --- Comparison ---------------------------------------------------------
+    compare_enabled: bool = Field(
+        default=True,
+        description="Keep Docling's raw extraction and score how much the "
+        "refining model changed it. Disabling this also stops the raw "
+        "Markdown being written, since nothing else reads it.",
+    )
+    compare_interval_s: float = Field(
+        default=60.0,
+        gt=0,
+        description="Seconds between comparison sweeps in the running daemon.",
+    )
+
     # --- Web interface ------------------------------------------------------
     web_enabled: bool = Field(
         default=True,
@@ -174,3 +187,13 @@ class Settings(BaseSettings):
     def metadata_dir(self) -> Path:
         """Destination for structured metadata sidecar files."""
         return self.output_dir / "metadata"
+
+    @property
+    def raw_dir(self) -> Path:
+        """Destination for Docling's unrefined extraction, kept for comparison."""
+        return self.output_dir / "raw"
+
+    @property
+    def comparison_dir(self) -> Path:
+        """Destination for per-document raw-vs-refined comparison scores."""
+        return self.output_dir / "comparison"

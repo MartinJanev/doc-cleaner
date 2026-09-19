@@ -8,6 +8,17 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `docpipe/docling_comparator.py`: a background sweep that scores each refined
+  document against the Docling extraction it came from, so the model's
+  contribution is measurable rather than assumed. Reports `similarity`,
+  `jaccard`, `retention`, `introduced` (the hallucination signal) and
+  `char_reduction`, plus before/after structural counts, to
+  `data/output/comparison/<key>.json`. Exposed as `docpipe compare`, which
+  needs neither Docling nor Ollama. Controlled by `DOCPIPE_COMPARE_ENABLED`
+  and `DOCPIPE_COMPARE_INTERVAL_S`.
+- Docling's raw extraction is preserved to `data/output/raw/<key>.md` before
+  refining, so a document that fails the model stage still leaves its
+  extraction behind.
 - `LICENSE` (MIT), `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md` and
   this changelog.
 - `pyproject.toml` with bounded dependency ranges, a `dev` extra and a `docpipe`
@@ -24,6 +35,15 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Typed response models on every route, so `/docs` describes a real schema.
 - `docpipe/core/ports.py`: `Extractor` and `Refiner` protocols, so a different
   extraction or LLM backend can be swapped in without touching the processor.
+
+### Fixed
+
+- Every path reference after the `data/` to `docpipe/data/` move. A
+  find-and-replace had produced a doubled `docpipe/data/data/` prefix in
+  `.gitignore`, `.dockerignore`, `README.md` and `CLAUDE.md`, which matched
+  nothing and left input documents and generated outputs untracked rather than
+  ignored, while `Settings` still defaulted to a `data/input` that no longer
+  existed.
 
 ### Changed
 

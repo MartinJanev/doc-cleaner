@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Local-first RAG preprocessor. Watches `docpipe/data/input`, extracts Markdown from `.pdf`/`.docx` with IBM Docling, refines it through a local Ollama model (cleanup + metadata), and writes `docpipe/data/output/markdown/<stem>.md` (with YAML front matter) plus `docpipe/data/output/metadata/<stem>.json`. No cloud calls. Python 3.11+, package in `docpipe/`.
+Local-first RAG preprocessor. Watches `docpipe/data/input`, extracts Markdown from `.pdf`/`.docx` with IBM Docling, refines it through a local Ollama model (cleanup + metadata), and writes `docpipe/data/output/markdown/<stem>.md` (with YAML front matter) plus `docpipe/data/output/metadata/<stem>.json`. A background comparator scores each refined document against the extraction it came from, so the model's contribution is measurable. No cloud calls. Python 3.11+, package in `docpipe/`.
 
 ## Commands
 
@@ -17,6 +17,7 @@ A `.venv/` with all dependencies (including Docling's heavy transitive deps) is 
 .venv/bin/python -m docpipe.main                           # run watcher + web UI (http://127.0.0.1:8000)
 pip install -r requirements.txt                            # fresh install
 docker compose up --build                                  # containerized; talks to host Ollama
+.venv/bin/python -m docpipe.cli compare                    # score raw-vs-refined; needs no Ollama
 ```
 
 There is no linter, formatter, or type-checker configured, and no pytest config file — `pytest` collects `tests/` by default.
@@ -41,6 +42,10 @@ watcher/runner.py (reconcile on startup + watchdog observer)
       → services/extraction_service.py (Docling)
       → services/llm_service.py + prompts.py (Ollama)
       → storage/file_repository.py (outputs) + storage/state_store.py (ledger)
+
+docling_comparator.py (own thread, interval sweep, out of band)
+  → scores output/raw/<key>.md against output/markdown/<key>.md
+  → writes output/comparison/<key>.json
 ```
 
 ### The ledger is the control plane
@@ -63,6 +68,37 @@ Identity is the content hash, but **output filenames are keyed by the source's p
 `FileRepository.output_key(source)` and `FileRepository.output_paths(key)` are the **only** place this mapping lives — `write_outputs` and the whole web layer go through them. Never rebuild an output path from `settings.markdown_dir` by hand. `DocumentService._unique_target` still de-duplicates colliding upload names (`report (1).pdf`) at ingest, since uploads all land flat in the input root.
 
 Keys legitimately contain `/`, so containment against the output roots (`DocumentService._checked_paths`) replaces any separator denylist.
+
+### Measuring the model
+
+The pipeline keeps only the model's answer, which makes the model's contribution
+invisible: nothing distinguishes a run that stripped page furniture from one that
+quietly rewrote the document. `docpipe/docling_comparator.py` scores the two texts
+against each other.
+
+`DocumentProcessor` calls `FileRepository.write_raw(document)` **before** refining, so
+a document that fails the model stage still leaves its extraction behind. `write_raw`
+is a no-op when `DOCPIPE_COMPARE_ENABLED=false`, which keeps the flag out of the
+processor.
+
+`DoclingComparator` runs **out of band** — its own daemon thread on
+`DOCPIPE_COMPARE_INTERVAL_S`, started by `main()` rather than by `WatcherRunner`,
+because it is measurement and must never sit on the path of producing a document.
+Pending work is derived entirely from the filesystem: a key is pending when a raw
+file exists, a refined file exists, and the comparison is missing or older than the
+refined output. That makes the sweep idempotent, self-healing after a crash, and able
+to pick up anything processed while comparison was switched off. It also means
+`docpipe compare` works with the daemon stopped and **needs neither Docling nor
+Ollama**.
+
+Scoring functions (`tokenize`, `strip_front_matter`, `measure`, `score`, `compare`)
+are pure and stdlib-only, for the same reason `services/prompts.py` keeps text away
+from transport. Front matter is stripped from the refined side first, or the model's
+own metadata block counts as invented prose.
+
+`introduced` is the score that matters: the share of output vocabulary absent from
+the input. A cleanup pass should sit near zero. `similarity` alone cannot tell good
+boilerplate removal from quiet rewriting — both read as low.
 
 ### Error boundary
 
@@ -95,6 +131,8 @@ All calls use Ollama's `format="json"` and go through `parse_llm_json`, which to
 - `PROJECT_NOTES.md` is gitignored on purpose (it is the author's private notes) — edits to it will not show up in `git status`. `.env.example` **is** tracked, because the README links to it.
 - Keep `DOCPIPE_MAX_WORKERS` at 1 unless there is memory headroom; Docling and Ollama are both memory-hungry and share the machine.
 - `DOCPIPE_LLM_NUM_CTX` must fit one chunk plus its cleaned output. Raising `DOCPIPE_LLM_CHUNK_CHARS` without raising `NUM_CTX` used to truncate model output silently; a `model_validator` on `Settings` now refuses to start instead. Keep that guard in sync if the chunking strategy changes.
+- Comparison records store `model` from the **currently configured** tag, not a recorded one — nothing downstream stores which model produced a given output. In the daemon the sweep follows processing by seconds, so it is accurate in practice; after changing `DOCPIPE_MODEL_TAG`, old scores keep the old tag until their document is reprocessed.
+- `difflib.SequenceMatcher` is superlinear, so the ordered `similarity` score is capped at `_SEQUENCE_TOKEN_CAP` (20k) tokens per side; the set-based scores are linear and always see the whole document. Two 20k-token sides take about a second.
 - The web UI bundles its own Markdown renderer (`web/static/js/markdown.js`) to stay fully offline — do not introduce a CDN dependency. The frontend is plain ES modules under `web/static/js/` with **no build step**; a strict CSP (`script-src 'self'`) would block a CDN anyway. Build DOM with the `el()` helper in `js/dom.js` rather than interpolating into `innerHTML`; the one exception is the Markdown renderer's output, which is safe because it escapes before it transforms.
 
 ## Repo rules (always active)

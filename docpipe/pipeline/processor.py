@@ -64,6 +64,9 @@ class DocumentProcessor:
         try:
             document = self._extraction.extract(path, file_hash)
             self._state.mark(file_hash, ProcessingState.EXTRACTED)
+            # Before refining, so a document that fails the model stage still
+            # leaves its extraction behind to look at.
+            self._repository.write_raw(document)
 
             restructured = self._llm.refine(document)
             self._state.mark(file_hash, ProcessingState.RESTRUCTURED)

@@ -17,6 +17,7 @@ from docpipe.core.logging import (
     get_logger,
 )
 from docpipe.core.ports import Refiner
+from docpipe.docling_comparator import DoclingComparator
 from docpipe.pipeline.processor import DocumentProcessor
 from docpipe.services.extraction_service import ExtractionService
 from docpipe.services.llm_service import LLMService
@@ -36,6 +37,7 @@ class Components:
     processor: DocumentProcessor
     runner: WatcherRunner
     llm_service: Refiner
+    comparator: DoclingComparator
 
 
 def build_components(settings: Settings) -> Components:
@@ -59,6 +61,9 @@ def build_components(settings: Settings) -> Components:
         markdown_dir=settings.markdown_dir,
         metadata_dir=settings.metadata_dir,
         supported_suffixes=settings.supported_suffixes,
+        raw_dir=settings.raw_dir,
+        comparison_dir=settings.comparison_dir,
+        keep_raw=settings.compare_enabled,
     )
     state_store = JsonStateStore(state_file=settings.state_file)
 
@@ -89,6 +94,12 @@ def build_components(settings: Settings) -> Components:
         job_queue=job_queue,
         debounce_seconds=settings.debounce_seconds,
     )
+    comparator = DoclingComparator(
+        repository=repository,
+        model=settings.model_tag,
+        interval_s=settings.compare_interval_s,
+    )
+
     return Components(
         repository=repository,
         state_store=state_store,
@@ -96,6 +107,7 @@ def build_components(settings: Settings) -> Components:
         processor=processor,
         runner=runner,
         llm_service=llm_service,
+        comparator=comparator,
     )
 
 
@@ -110,29 +122,37 @@ def main() -> None:
     else:
         get_logger("docpipe.main").error("boot.preflight.failed", remedy=problem)
 
-    if not settings.web_enabled:
-        components.runner.start()
-        return
+    # The comparator is out of band by design, so it hangs off whichever front
+    # end happens to be the foreground process rather than off the watcher.
+    if settings.compare_enabled:
+        components.comparator.start_background()
 
-    import uvicorn
+    try:
+        if not settings.web_enabled:
+            components.runner.start()
+            return
 
-    from docpipe.web.app import create_app
-    from docpipe.web.service import DocumentService
+        import uvicorn
 
-    service = DocumentService(
-        settings=settings,
-        repository=components.repository,
-        state_store=components.state_store,
-        submit_job=components.job_queue.submit,
-        preflight=components.llm_service.preflight,
-    )
-    app = create_app(service, runner=components.runner)
+        from docpipe.web.app import create_app
+        from docpipe.web.service import DocumentService
 
-    get_logger("docpipe.main").info(
-        "web.serving", host=settings.web_host, port=settings.web_port
-    )
-    configure_uvicorn_access_logging()
-    uvicorn.run(app, host=settings.web_host, port=settings.web_port)
+        service = DocumentService(
+            settings=settings,
+            repository=components.repository,
+            state_store=components.state_store,
+            submit_job=components.job_queue.submit,
+            preflight=components.llm_service.preflight,
+        )
+        app = create_app(service, runner=components.runner)
+
+        get_logger("docpipe.main").info(
+            "web.serving", host=settings.web_host, port=settings.web_port
+        )
+        configure_uvicorn_access_logging()
+        uvicorn.run(app, host=settings.web_host, port=settings.web_port)
+    finally:
+        components.comparator.stop()
 
 
 if __name__ == "__main__":

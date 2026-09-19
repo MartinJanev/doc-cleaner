@@ -51,6 +51,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subcommands.add_parser("status", help="Summarise the processing ledger.")
+
+    compare = subcommands.add_parser(
+        "compare",
+        help="Score how much the model changed Docling's extraction.",
+    )
+    compare.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Summarise existing scores without scoring anything new.",
+    )
     return parser
 
 
@@ -61,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "status":
         return _status(settings)
+    if args.command == "compare":
+        return _compare(settings, report_only=args.report_only)
     if args.command == "process":
         return _process(settings, args.path, dry_run=args.dry_run)
     if args.command == "run" and args.once:
@@ -162,6 +174,45 @@ def _process(settings: Settings, path: Path, dry_run: bool) -> int:
     return 0
 
 
+def _compare(settings: Settings, report_only: bool) -> int:
+    """Score unscored documents, then print the fleet-wide averages.
+
+    Needs neither Docling nor Ollama: comparison reads files the pipeline has
+    already written.
+    """
+    from docpipe.docling_comparator import SCORE_FIELDS, DoclingComparator
+
+    comparator = DoclingComparator(
+        repository=_repository(settings),
+        model=settings.model_tag,
+        interval_s=settings.compare_interval_s,
+    )
+    if not report_only:
+        print(f"Scored {comparator.sweep()} new document(s).")
+
+    report = comparator.report()
+    if not report["documents"]:
+        print(
+            "No comparisons yet. Documents processed before comparison was "
+            "enabled have no preserved extraction to score against; reprocess "
+            "one to produce the first."
+        )
+        return 0
+
+    models = ", ".join(report["models"])
+    print(f"\n{report['documents']} document(s) compared  ·  model: {models}")
+    for field in SCORE_FIELDS:
+        print(f"  {field:<15} {report['means'][field]:.4f}")
+
+    print("\nMost changed by the model (highest share of new text):")
+    for entry in report["most_changed"]:
+        print(
+            f"  {entry['introduced']:.4f} introduced  "
+            f"{entry['similarity']:.4f} similar   {entry['key']}"
+        )
+    return 0
+
+
 def _run_once(settings: Settings) -> int:
     """Drain the input directory, then stop."""
     from docpipe.main import build_components
@@ -184,6 +235,9 @@ def _repository(settings: Settings) -> FileRepository:
         markdown_dir=settings.markdown_dir,
         metadata_dir=settings.metadata_dir,
         supported_suffixes=settings.supported_suffixes,
+        raw_dir=settings.raw_dir,
+        comparison_dir=settings.comparison_dir,
+        keep_raw=settings.compare_enabled,
     )
 
 

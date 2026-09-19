@@ -46,6 +46,10 @@ docpipe/data/input/*.pdf | *.docx
         ▼                          ▼
   state ledger             docpipe/data/output/markdown/*.md
   (.pipeline_state.json)   docpipe/data/output/metadata/*.json
+                                       │
+                                       ▼
+                           comparator (background sweep)
+                           docpipe/data/output/comparison/*.json
 ```
 
 Every document moves through a sequence of states:
@@ -61,12 +65,55 @@ Progress is tracked in a JSON ledger keyed by the **file's content hash**. Two n
 
 ## What you get
 
-For an input file named `report.pdf`, doc-cleaner writes two files:
+For an input file named `report.pdf`, doc-cleaner writes:
 
 - `docpipe/data/output/markdown/report.md` — cleaned Markdown with a YAML front-matter header.
 - `docpipe/data/output/metadata/report.json` — structured metadata (plus the source filename and content hash).
+- `docpipe/data/output/raw/report.md` — Docling's extraction before the model touched it.
+- `docpipe/data/output/comparison/report.json` — how much the model changed it (see below).
+
+The last two exist only so the model's contribution is measurable, and can be turned off with `DOCPIPE_COMPARE_ENABLED=false`.
 
 Subfolders are mirrored, so `docpipe/data/input/2024/report.pdf` writes to `docpipe/data/output/markdown/2024/report.md`. Two files with the same name in different folders keep separate outputs.
+
+## Measuring what the model adds
+
+Running documents through a local model is only worth the RAM if it improves them, and
+that is hard to see when the extraction it started from is thrown away. doc-cleaner keeps
+that extraction and scores the refined output against it, in a background sweep that never
+sits on the path of producing a document.
+
+```bash
+$ docpipe compare
+Scored 3 new document(s).
+
+3 document(s) compared  ·  model: qwen2.5:14b
+  similarity      0.9946
+  jaccard         0.9971
+  retention       0.9971
+  introduced      0.0000
+  char_reduction  0.0097
+
+Most changed by the model (highest share of new text):
+  0.0180 introduced  0.9631 similar   2024/quarterly-report
+  0.0000 introduced  0.9948 similar   handbook
+```
+
+| Score | What it means |
+| --- | --- |
+| `similarity` | Ordered token overlap — how much of the extraction survived, in place. |
+| `jaccard` | Vocabulary overlap, ignoring order. |
+| `retention` | Share of the extraction's vocabulary still present. Low means the model dropped a lot. |
+| `introduced` | Share of the output's vocabulary that was **not** in the extraction. |
+| `char_reduction` | How much shorter the output is. Negative if the model produced more than it was given. |
+
+**`introduced` is the one to watch.** A cleanup pass should sit near zero; anything higher
+is text the model wrote rather than kept. No single number says whether a run was *good* —
+aggressive boilerplate removal and quiet rewriting both read as low `similarity`. Reading
+`introduced` and the per-document structural counts (headings, table rows, links, code
+blocks, before and after) alongside it is what separates them.
+
+Each document's full record lands in `docpipe/data/output/comparison/<key>.json`.
 
 ## Architecture
 
@@ -84,6 +131,7 @@ The codebase is layered, dependency-injected, and single-responsibility. Concret
 | storage | `storage/file_repository.py` | Input reads, output routing, hashing |
 | pipeline | `pipeline/processor.py` | End-to-end orchestration + error boundary |
 | watcher | `watcher/*` | Debounced events, job queue, runner |
+| root | `docling_comparator.py` | Out-of-band raw-vs-refined scoring |
 | root | `main.py` | Composition root (DI wiring) |
 
 (All paths are under `docpipe/`.)
@@ -146,6 +194,8 @@ settings:
 | `docpipe process report.pdf` | Process one file synchronously and print where the outputs landed. |
 | `docpipe process report.pdf --dry-run` | Extract only, print the raw Markdown. **Needs no Ollama** — the quickest way to check Docling is working. |
 | `docpipe status` | Summarise the ledger: counts per state and recent failures. Exits non-zero if anything failed. |
+| `docpipe compare` | Score how much the model changed Docling's extraction, then print the averages. **Needs no Ollama.** |
+| `docpipe compare --report-only` | Print the averages without scoring anything new. |
 
 ```bash
 $ docpipe status
