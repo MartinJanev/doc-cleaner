@@ -57,7 +57,7 @@ version = { attr = "docpipe.__version__" }
 include = ["docpipe*"]
 
 [tool.setuptools.package-data]
-docpipe = ["web/static/*"]
+docpipe = ["web/static/*", "web/static/js/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

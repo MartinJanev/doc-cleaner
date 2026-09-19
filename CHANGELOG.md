@@ -25,6 +25,18 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `docpipe/core/ports.py`: `Extractor` and `Refiner` protocols, so a different
   extraction or LLM backend can be swapped in without touching the processor.
 
+### Changed
+
+- The web interface was rebuilt: a token-based design system with light and dark
+  themes (following the system preference, with an override), `app.js` split
+  into ES modules with no build step, DOM construction instead of HTML string
+  interpolation, a native `<dialog>` for confirmations, focus management in the
+  preview drawer, proper tab semantics, a filter box, loading skeletons, a real
+  empty state, and a card layout on narrow screens that keeps the data rather
+  than hiding columns.
+- The UI now says when it cannot reach the backend, instead of silently freezing
+  on stale data, and shows a health pill for the model.
+
 ### Security
 
 - A strict `Content-Security-Policy` (plus `X-Content-Type-Options` and

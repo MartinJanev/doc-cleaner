@@ -1,8 +1,12 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Turn PDFs and Word documents into clean, LLM-ready Markdown, entirely on your own machine."
+    />
     <title>doc-cleaner</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/static/styles.css" />
@@ -10,121 +14,159 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <img class="logo" src="/favicon.svg" alt="" width="42" height="42" />
+        <img src="/favicon.svg" alt="" width="32" height="32" />
         <div>
           <h1>doc-cleaner</h1>
-          <p class="tagline">PDF &amp; DOCX &rarr; clean, LLM-ready Markdown</p>
+          <p>PDF &amp; DOCX &rarr; clean, LLM-ready Markdown</p>
         </div>
+      </div>
+      <div class="topbar-actions">
+        <span id="health" class="health" title="Pipeline status">Checking&hellip;</span>
+        <button
+          id="theme-toggle"
+          class="icon-btn"
+          type="button"
+          aria-label="Switch colour theme"
+          title="Switch colour theme"
+        >
+          <span aria-hidden="true">◐</span>
+        </button>
       </div>
     </header>
 
     <main>
-      <section
-        id="dropzone"
-        class="dropzone"
-        aria-label="Upload documents"
-        tabindex="0"
-      >
-        <input id="file-input" type="file" accept=".pdf,.docx" multiple hidden />
-        <div class="dropzone-inner">
-          <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-          <strong>Drop PDF or DOCX files here</strong>
-          <span>or click to browse</span>
-        </div>
-      </section>
+      <!-- Filled in by the app when the backend is unreachable or degraded. -->
+      <div id="banner" class="banner" role="status" hidden></div>
 
-      <section class="panel">
+      <button id="dropzone" class="dropzone" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M12 16V4m0 0L7 9m5-5 5 5M5 20h14" />
+        </svg>
+        <span class="dropzone-title">Drop PDF or DOCX files here</span>
+        <span class="dropzone-hint">or click to browse</span>
+      </button>
+      <input id="file-input" type="file" accept=".pdf,.docx" multiple hidden />
+
+      <dl class="stats">
+        <div class="stat">
+          <dt>Total</dt>
+          <dd id="stat-total">&mdash;</dd>
+        </div>
+        <div class="stat" data-tone="working">
+          <dt>Processing</dt>
+          <dd id="stat-working">&mdash;</dd>
+        </div>
+        <div class="stat" data-tone="ok">
+          <dt>Completed</dt>
+          <dd id="stat-completed">&mdash;</dd>
+        </div>
+        <div class="stat" data-tone="bad">
+          <dt>Failed</dt>
+          <dd id="stat-failed">&mdash;</dd>
+        </div>
+      </dl>
+
+      <section class="card" aria-labelledby="documents-heading">
         <div class="panel-head">
-          <h2>Documents</h2>
-          <div class="stats" id="stats" aria-label="Document counts">
-            <span class="stat total"><b id="stat-total">0</b> total</span>
-            <span class="stat working"><b id="stat-working">0</b> processing</span>
-            <span class="stat ok"><b id="stat-completed">0</b> completed</span>
-            <span class="stat bad"><b id="stat-failed">0</b> failed</span>
+          <h2 id="documents-heading">Documents</h2>
+          <div class="search">
+            <label class="visually-hidden" for="search">Filter documents</label>
+            <input
+              id="search"
+              type="search"
+              placeholder="Filter by name&hellip;"
+              autocomplete="off"
+            />
           </div>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th class="progress-col">Progress</th>
-                <th>Updated</th>
-                <th class="actions-col">Actions</th>
+                <th scope="col">Name</th>
+                <th scope="col">Progress</th>
+                <th scope="col">Updated</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
               </tr>
             </thead>
-            <tbody id="doc-rows">
-              <tr class="empty">
-                <td colspan="4">No documents yet &mdash; upload one to begin.</td>
-              </tr>
-            </tbody>
+            <tbody id="rows"></tbody>
           </table>
         </div>
       </section>
     </main>
 
-    <div id="toasts" class="toasts" aria-live="polite"></div>
-
-    <div id="preview" class="drawer" hidden aria-hidden="true">
+    <aside
+      id="drawer"
+      class="drawer"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="drawer-title"
+      hidden
+    >
       <div class="drawer-head">
-        <div class="drawer-title">
-          <h3 id="preview-title">Preview</h3>
-          <div class="tabs" role="tablist">
-            <button class="tab active" data-tab="markdown" role="tab">
+        <div>
+          <h2 id="drawer-title">Preview</h2>
+          <div class="tabs" role="tablist" aria-label="Preview format">
+            <button
+              class="tab"
+              type="button"
+              role="tab"
+              id="tab-markdown"
+              data-tab="markdown"
+              aria-selected="true"
+              aria-controls="drawer-body"
+            >
               Markdown
             </button>
-            <button class="tab" data-tab="metadata" role="tab">Metadata</button>
+            <button
+              class="tab"
+              type="button"
+              role="tab"
+              id="tab-metadata"
+              data-tab="metadata"
+              aria-selected="false"
+              aria-controls="drawer-body"
+              tabindex="-1"
+            >
+              Metadata
+            </button>
           </div>
         </div>
         <div class="drawer-tools">
-          <a
-            id="dl-markdown"
-            class="btn"
-            href="#"
-            download
-            title="Download Markdown"
-            >Download .md</a
-          >
-          <a
-            id="dl-metadata"
-            class="btn"
-            href="#"
-            download
-            title="Download metadata"
-            >Download .json</a
-          >
-          <button id="preview-close" class="icon-btn" aria-label="Close">
-            &times;
+          <a id="download-markdown" class="btn" href="#" download>.md</a>
+          <a id="download-metadata" class="btn" href="#" download>.json</a>
+          <button id="drawer-close" class="icon-btn" type="button" aria-label="Close preview">
+            <span aria-hidden="true">&times;</span>
           </button>
         </div>
       </div>
-      <div id="preview-body" class="preview-body"></div>
-    </div>
+      <div
+        id="drawer-body"
+        class="drawer-body"
+        role="tabpanel"
+        aria-labelledby="tab-markdown"
+        tabindex="0"
+      ></div>
+    </aside>
 
-    <div id="modal" class="modal-overlay" hidden>
-      <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-title">
-        <h3 id="modal-title">Delete document?</h3>
-        <p id="modal-text">
-          This removes the input file, its cleaned outputs, and its processing
-          history. This cannot be undone.
-        </p>
-        <div class="modal-actions">
-          <button id="modal-cancel" class="btn">Cancel</button>
-          <button id="modal-confirm" class="btn danger solid">Delete</button>
-        </div>
+    <dialog id="confirm">
+      <h2 id="confirm-title">Delete document?</h2>
+      <p id="confirm-text">
+        This removes the input file, its cleaned outputs, and its processing
+        history. This cannot be undone.
+      </p>
+      <div class="dialog-actions">
+        <button id="confirm-cancel" class="btn" type="button">Cancel</button>
+        <button id="confirm-ok" class="btn" data-variant="danger-solid" type="button">
+          Delete
+        </button>
       </div>
-    </div>
+    </dialog>
 
-    <script src="/static/markdown.js"></script>
-    <script src="/static/app.js"></script>
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/static/js/main.js"></script>
   </body>
 </html>

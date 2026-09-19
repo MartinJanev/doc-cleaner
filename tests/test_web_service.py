@@ -343,3 +343,45 @@ def _client_with_preflight(tmp_path: Path, preflight) -> TestClient:
         preflight=preflight,
     )
     return TestClient(create_app(service))
+
+
+# --- Static assets -----------------------------------------------------------
+
+
+def test_every_asset_referenced_by_the_page_is_served(env) -> None:
+    """The page must not reference a file that does not exist.
+
+    The frontend is plain ES modules with no bundler, so nothing else would
+    catch a stale path after a file is moved or renamed -- the browser would
+    just fail silently.
+    """
+    import re
+
+    client = env["client"]
+    page = client.get("/").text
+    references = set(re.findall(r'(?:src|href)="(/[^"]+)"', page))
+    assert references, "no assets referenced by index.html"
+
+    for url in sorted(references):
+        assert client.get(url).status_code == 200, f"{url} is referenced but not served"
+
+
+def test_javascript_modules_resolve_their_imports(env) -> None:
+    """Follow every relative import from main.js and confirm it is served."""
+    import re
+
+    client = env["client"]
+    seen: set[str] = set()
+    queue = ["/static/js/main.js"]
+    while queue:
+        url = queue.pop()
+        if url in seen:
+            continue
+        seen.add(url)
+        res = client.get(url)
+        assert res.status_code == 200, f"{url} is imported but not served"
+        base = url.rsplit("/", 1)[0]
+        for target in re.findall(r'from\s+"(\./[^"]+)"', res.text):
+            queue.append(f"{base}/{target[2:]}")
+
+    assert "/static/js/markdown.js" in seen  # the import graph was actually walked

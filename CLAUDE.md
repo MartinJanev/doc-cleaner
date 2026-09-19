@@ -95,7 +95,7 @@ All calls use Ollama's `format="json"` and go through `parse_llm_json`, which to
 - `PROJECT_NOTES.md` is gitignored on purpose (it is the author's private notes) — edits to it will not show up in `git status`. `.env.example` **is** tracked, because the README links to it.
 - Keep `DOCPIPE_MAX_WORKERS` at 1 unless there is memory headroom; Docling and Ollama are both memory-hungry and share the machine.
 - `DOCPIPE_LLM_NUM_CTX` must fit one chunk plus its cleaned output. Raising `DOCPIPE_LLM_CHUNK_CHARS` without raising `NUM_CTX` used to truncate model output silently; a `model_validator` on `Settings` now refuses to start instead. Keep that guard in sync if the chunking strategy changes.
-- The web UI bundles its own Markdown renderer (`web/static/markdown.js`) to stay fully offline — do not introduce a CDN dependency.
+- The web UI bundles its own Markdown renderer (`web/static/js/markdown.js`) to stay fully offline — do not introduce a CDN dependency. The frontend is plain ES modules under `web/static/js/` with **no build step**; a strict CSP (`script-src 'self'`) would block a CDN anyway. Build DOM with the `el()` helper in `js/dom.js` rather than interpolating into `innerHTML`; the one exception is the Markdown renderer's output, which is safe because it escapes before it transforms.
 
 ## Repo rules (always active)
 

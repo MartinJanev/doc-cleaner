@@ -16,6 +16,17 @@ doc-cleaner watches a folder, and whenever you drop in a `.pdf` or `.docx`, it:
 
 It's built for RAG (Retrieval-Augmented Generation) pipelines that need tidy source text. Nothing leaves your machine — there are no cloud APIs.
 
+![The doc-cleaner web interface: a drop zone, live processing counts, and a table of documents with per-stage progress](docs/screenshot-light.png)
+
+<details>
+<summary>Same interface in dark mode</summary>
+
+![doc-cleaner in dark mode](docs/screenshot-dark.png)
+
+The UI follows your system theme, and the toggle in the header overrides it.
+
+</details>
+
 ## How it works
 
 Drop a file in, get clean Markdown out:
