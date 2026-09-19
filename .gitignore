@@ -19,12 +19,14 @@ dist/
 .env
 .pipeline_state.json
 *.db
-data/input/*
-data/output/markdown/*
-data/output/metadata/*
+docpipe/data/input/*
+docpipe/data/output/markdown/*
+docpipe/data/output/metadata/*
+docpipe/data/output/raw/*
+docpipe/data/output/comparison/*
 
 # Keep the directory structure
-!data/input/.gitkeep
-!data/output/markdown/.gitkeep
-!data/output/metadata/.gitkeep
+!docpipe/data/input/.gitkeep
+!docpipe/data/output/markdown/.gitkeep
+!docpipe/data/output/metadata/.gitkeep
 PROJECT_NOTES.md

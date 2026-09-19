@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Local-first RAG preprocessor. Watches `data/input`, extracts Markdown from `.pdf`/`.docx` with IBM Docling, refines it through a local Ollama model (cleanup + metadata), and writes `data/output/markdown/<stem>.md` (with YAML front matter) plus `data/output/metadata/<stem>.json`. No cloud calls. Python 3.11+, package in `docpipe/`.
+Local-first RAG preprocessor. Watches `docpipe/data/input`, extracts Markdown from `.pdf`/`.docx` with IBM Docling, refines it through a local Ollama model (cleanup + metadata), and writes `docpipe/data/output/markdown/<stem>.md` (with YAML front matter) plus `docpipe/data/output/metadata/<stem>.json`. No cloud calls. Python 3.11+, package in `docpipe/`.
 
 ## Commands
 

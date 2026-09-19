@@ -32,7 +32,7 @@ The UI follows your system theme, and the toggle in the header overrides it.
 Drop a file in, get clean Markdown out:
 
 ```
-data/input/*.pdf | *.docx
+docpipe/data/input/*.pdf | *.docx
         │
         ▼
   watcher (debounced)  ──►  job queue (thread pool)
@@ -44,8 +44,8 @@ data/input/*.pdf | *.docx
         │          (extract)  (refine +    (write output)
         │                       metadata)
         ▼                          ▼
-  state ledger             data/output/markdown/*.md
-  (.pipeline_state.json)   data/output/metadata/*.json
+  state ledger             docpipe/data/output/markdown/*.md
+  (.pipeline_state.json)   docpipe/data/output/metadata/*.json
 ```
 
 Every document moves through a sequence of states:
@@ -63,10 +63,10 @@ Progress is tracked in a JSON ledger keyed by the **file's content hash**. Two n
 
 For an input file named `report.pdf`, doc-cleaner writes two files:
 
-- `data/output/markdown/report.md` — cleaned Markdown with a YAML front-matter header.
-- `data/output/metadata/report.json` — structured metadata (plus the source filename and content hash).
+- `docpipe/data/output/markdown/report.md` — cleaned Markdown with a YAML front-matter header.
+- `docpipe/data/output/metadata/report.json` — structured metadata (plus the source filename and content hash).
 
-Subfolders are mirrored, so `data/input/2024/report.pdf` writes to `data/output/markdown/2024/report.md`. Two files with the same name in different folders keep separate outputs.
+Subfolders are mirrored, so `docpipe/data/input/2024/report.pdf` writes to `docpipe/data/output/markdown/2024/report.md`. Two files with the same name in different folders keep separate outputs.
 
 ## Architecture
 
@@ -128,7 +128,7 @@ the console script.)
 **4. Use it — two ways:**
 
 - **Web UI:** open [http://127.0.0.1:8000](http://127.0.0.1:8000) to upload documents, watch processing status live, preview/download cleaned Markdown and metadata, and retry/reprocess/delete documents.
-- **Drop folder:** copy a PDF or DOCX into `data/input/`, then watch `data/output/markdown/` and `data/output/metadata/` fill up.
+- **Drop folder:** copy a PDF or DOCX into `docpipe/data/input/`, then watch `docpipe/data/output/markdown/` and `docpipe/data/output/metadata/` fill up.
 
 Both share the same pipeline, so files added either way show up in the UI.
 
@@ -142,7 +142,7 @@ settings:
 | Command | What it does |
 | --- | --- |
 | `docpipe run` | Watcher + web UI. The default, and what `docpipe` alone runs. |
-| `docpipe run --once` | Process everything already in `data/input`, then exit. |
+| `docpipe run --once` | Process everything already in `docpipe/data/input`, then exit. |
 | `docpipe process report.pdf` | Process one file synchronously and print where the outputs landed. |
 | `docpipe process report.pdf --dry-run` | Extract only, print the raw Markdown. **Needs no Ollama** — the quickest way to check Docling is working. |
 | `docpipe status` | Summarise the ledger: counts per state and recent failures. Exits non-zero if anything failed. |
@@ -191,7 +191,7 @@ The container runs the pipeline and connects to **Ollama on your host** via `hos
 docker compose up --build
 ```
 
-Your local `./data` folder is mounted into the container, so inputs, outputs, and the state ledger all persist on the host. A named volume caches Docling's models between runs so it doesn't re-download them every time.
+Your local `docpipe/data` folder is mounted into the container, so inputs, outputs, and the state ledger all persist on the host. A named volume caches Docling's models between runs so it doesn't re-download them every time.
 
 The UI is published on `127.0.0.1:8000` only. Inside the container the server
 binds `0.0.0.0` (it has to, to be reachable through the port mapping), but the

@@ -6,8 +6,8 @@ __pycache__
 *.pyc
 *.pyo
 .pytest_cache
-data/input/*
-data/output/*
+docpipe/data/input/*
+docpipe/data/output/*
 .pipeline_state.json
 *.db
 .DS_Store

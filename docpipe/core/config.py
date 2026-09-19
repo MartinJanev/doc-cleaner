@@ -34,11 +34,11 @@ class Settings(BaseSettings):
 
     # --- Filesystem ---------------------------------------------------------
     input_dir: Path = Field(
-        default=Path("data/input"),
+        default=Path("docpipe/data/input"),
         description="Directory watched for incoming documents.",
     )
     output_dir: Path = Field(
-        default=Path("data/output"),
+        default=Path("docpipe/data/output"),
         description="Root directory for generated artifacts.",
     )
     state_file: Path = Field(
