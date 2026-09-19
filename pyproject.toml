@@ -86,7 +86,10 @@ select = [
 python_version = "3.11"
 files = ["docpipe"]
 strict = true
-# Neither ships type information.
+# docling and ollama ship no type information; uvicorn is simply absent from
+# the lint environment, which installs the package with --no-deps to enforce
+# the lazy-import rule. Only `uvicorn.run(app, host=..., port=...)` is called,
+# so nothing here depends on its types.
 [[tool.mypy.overrides]]
-module = ["docling.*", "ollama.*"]
+module = ["docling.*", "ollama.*", "uvicorn", "uvicorn.*"]
 ignore_missing_imports = true
