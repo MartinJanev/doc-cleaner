@@ -12,9 +12,8 @@ from pathlib import Path
 
 from docpipe.core.exceptions import PipelineError
 from docpipe.core.logging import get_logger
+from docpipe.core.ports import Extractor, Refiner
 from docpipe.models.documents import ProcessingState, RestructuredDocument
-from docpipe.services.extraction_service import ExtractionService
-from docpipe.services.llm_service import LLMService
 from docpipe.storage.file_repository import FileRepository
 from docpipe.storage.state_store import JsonStateStore
 
@@ -26,8 +25,8 @@ class DocumentProcessor:
 
     def __init__(
         self,
-        extraction_service: ExtractionService,
-        llm_service: LLMService,
+        extraction_service: Extractor,
+        llm_service: Refiner,
         file_repository: FileRepository,
         state_store: JsonStateStore,
         max_attempts: int,

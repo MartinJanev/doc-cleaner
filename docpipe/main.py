@@ -16,6 +16,7 @@ from docpipe.core.logging import (
     configure_uvicorn_access_logging,
     get_logger,
 )
+from docpipe.core.ports import Refiner
 from docpipe.pipeline.processor import DocumentProcessor
 from docpipe.services.extraction_service import ExtractionService
 from docpipe.services.llm_service import LLMService
@@ -34,7 +35,7 @@ class Components:
     job_queue: JobQueue
     processor: DocumentProcessor
     runner: WatcherRunner
-    llm_service: LLMService
+    llm_service: Refiner
 
 
 def build_components(settings: Settings) -> Components:
@@ -123,6 +124,7 @@ def main() -> None:
         repository=components.repository,
         state_store=components.state_store,
         submit_job=components.job_queue.submit,
+        preflight=components.llm_service.preflight,
     )
     app = create_app(service, runner=components.runner)
 

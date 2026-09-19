@@ -107,10 +107,12 @@ pip install -e .          # add ".[dev]" for the test and lint tooling
 **3. Start the pipeline:**
 
 ```bash
-python -m docpipe.main
+docpipe run
 ```
 
 This single command starts both the file watcher and the web interface.
+(`python -m docpipe.main` does the same thing if you would rather not install
+the console script.)
 
 **4. Use it — two ways:**
 
@@ -120,6 +122,30 @@ This single command starts both the file watcher and the web interface.
 Both share the same pipeline, so files added either way show up in the UI.
 
 Configuration is done through environment variables (all prefixed with `DOCPIPE_`). See [.env.example](.env.example) for the full list.
+
+## Command line
+
+The daemon is not the only way in. Every command respects the same `DOCPIPE_`
+settings:
+
+| Command | What it does |
+| --- | --- |
+| `docpipe run` | Watcher + web UI. The default, and what `docpipe` alone runs. |
+| `docpipe run --once` | Process everything already in `data/input`, then exit. |
+| `docpipe process report.pdf` | Process one file synchronously and print where the outputs landed. |
+| `docpipe process report.pdf --dry-run` | Extract only, print the raw Markdown. **Needs no Ollama** — the quickest way to check Docling is working. |
+| `docpipe status` | Summarise the ledger: counts per state and recent failures. Exits non-zero if anything failed. |
+
+```bash
+$ docpipe status
+8 document(s) in .pipeline_state.json
+
+  COMPLETED      7
+  FAILED         1
+
+Failures:
+  CV Baza.docx: Ollama call failed: connection refused
+```
 
 ## Web interface
 
@@ -141,6 +167,11 @@ It's controlled by these settings:
 | `DOCPIPE_WEB_PORT` | `8000` | Port the UI listens on. |
 | `DOCPIPE_WEB_MAX_UPLOAD_MB` | `200` | Maximum size accepted for a single upload. |
 
+It is unauthenticated by design — see [SECURITY.md](SECURITY.md) for the threat
+model. The server sets a strict `Content-Security-Policy` (so a previewed
+document cannot fetch anything remote), refuses cross-site writes, and exposes
+`GET /health` plus an OpenAPI schema at `/docs`.
+
 ## Running with Docker
 
 The container runs the pipeline and connects to **Ollama on your host** via `host.docker.internal`:
@@ -151,7 +182,15 @@ docker compose up --build
 
 Your local `./data` folder is mounted into the container, so inputs, outputs, and the state ledger all persist on the host. A named volume caches Docling's models between runs so it doesn't re-download them every time.
 
-To reach the web UI from the host, bind it to all interfaces and publish the port — set `DOCPIPE_WEB_HOST=0.0.0.0` and map `-p 8000:8000` (or the equivalent `ports:` entry in your compose file).
+The UI is published on `127.0.0.1:8000` only. Inside the container the server
+binds `0.0.0.0` (it has to, to be reachable through the port mapping), but the
+mapping itself is loopback-bound so nothing on your network can reach it. The
+container also reports a Docker health status derived from `/health`, so
+`docker ps` shows `unhealthy` when Ollama is unreachable or the model is not
+pulled.
+
+**Before you widen that binding**, read [SECURITY.md](SECURITY.md): the UI is
+unauthenticated and can delete documents.
 
 ## Resource notes
 

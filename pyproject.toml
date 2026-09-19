@@ -48,7 +48,7 @@ Homepage = "https://github.com/martinjanev/doc-cleaner"
 Issues = "https://github.com/martinjanev/doc-cleaner/issues"
 
 [project.scripts]
-docpipe = "docpipe.main:main"
+docpipe = "docpipe.cli:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "docpipe.__version__" }

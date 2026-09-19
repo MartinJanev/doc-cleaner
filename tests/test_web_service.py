@@ -271,3 +271,75 @@ def test_output_key_cannot_escape_the_output_directory(env) -> None:
         env["service"].read_markdown("../../etc/passwd")
     with pytest.raises(StorageError):
         env["service"].read_markdown("")
+
+
+# --- Hardening and the API contract -----------------------------------------
+
+
+def test_security_headers_are_set_on_every_response(env) -> None:
+    """A previewed document must not be able to fetch anything remote."""
+    res = env["client"].get("/api/documents")
+    csp = res.headers["content-security-policy"]
+    assert "default-src 'self'" in csp
+    assert "img-src 'self' data:" in csp
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["referrer-policy"] == "no-referrer"
+
+
+def test_cross_site_writes_are_rejected(env) -> None:
+    """Upload and retry are CORS-simple, so a visited page could drive them."""
+    res = env["client"].post(
+        "/api/upload",
+        files={"file": ("doc.pdf", b"%PDF-1.4 data", "application/pdf")},
+        headers={"Sec-Fetch-Site": "cross-site"},
+    )
+    assert res.status_code == 403
+    assert not (env["settings"].input_dir / "doc.pdf").exists()
+
+
+def test_same_site_and_non_browser_writes_still_work(env) -> None:
+    for headers in ({"Sec-Fetch-Site": "same-origin"}, {}):
+        res = env["client"].post(
+            "/api/upload",
+            files={"file": ("doc.pdf", b"%PDF-1.4 data", "application/pdf")},
+            headers=headers,
+        )
+        assert res.status_code == 200, headers
+
+
+def test_health_reports_ok_when_the_model_is_ready(tmp_path: Path) -> None:
+    client = _client_with_preflight(tmp_path, lambda: None)
+    body = client.get("/health").json()
+    assert body["status"] == "ok"
+    assert body["ollama"] is None
+    assert body["model"] == Settings().model_tag
+    assert body["version"]
+
+
+def test_health_reports_degraded_and_says_what_to_do(tmp_path: Path) -> None:
+    client = _client_with_preflight(tmp_path, lambda: "run `ollama pull x`")
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["ollama"] == "run `ollama pull x`"
+
+
+def _client_with_preflight(tmp_path: Path, preflight) -> TestClient:
+    settings = Settings(
+        input_dir=tmp_path / "input",
+        output_dir=tmp_path / "output",
+        state_file=tmp_path / "state.json",
+    )
+    repository = FileRepository(
+        input_dir=settings.input_dir,
+        markdown_dir=settings.markdown_dir,
+        metadata_dir=settings.metadata_dir,
+        supported_suffixes=settings.supported_suffixes,
+    )
+    repository.ensure_directories()
+    service = DocumentService(
+        settings=settings,
+        repository=repository,
+        state_store=JsonStateStore(state_file=settings.state_file),
+        preflight=preflight,
+    )
+    return TestClient(create_app(service))

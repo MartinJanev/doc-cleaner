@@ -12,9 +12,11 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from docpipe import __version__
 from docpipe.core.config import Settings
 from docpipe.core.exceptions import StorageError, UploadTooLargeError
 from docpipe.core.logging import get_logger
@@ -36,16 +38,35 @@ class DocumentService:
         settings: Settings,
         repository: FileRepository,
         state_store: JsonStateStore,
-        submit_job: Any | None = None,
+        submit_job: Callable[[Path], bool] | None = None,
+        preflight: Callable[[], str | None] | None = None,
     ) -> None:
         self._settings = settings
         self._repository = repository
         self._state = state_store
-        # Callable[[Path], bool]; the shared JobQueue.submit. Optional so tests
-        # can run without a live queue (uploads still land for the watcher).
+        # The shared JobQueue.submit. Optional so tests can run without a live
+        # queue (uploads still land on disk for the watcher to pick up).
         self._submit_job = submit_job
+        # LLMService.preflight. Optional for the same reason; /health then
+        # reports the model as unchecked rather than guessing.
+        self._preflight = preflight
         self._hash_cache: dict[str, tuple[int, int, str]] = {}
         self._cache_lock = threading.Lock()
+
+    # --- Health ------------------------------------------------------------
+    def health(self) -> dict[str, Any]:
+        """Report whether the pipeline can actually process a document.
+
+        The interesting failure is not "is the web server up" -- it is "is the
+        model reachable", which is what makes every document fail one by one.
+        """
+        problem = self._preflight() if self._preflight is not None else None
+        return {
+            "status": "ok" if problem is None else "degraded",
+            "version": __version__,
+            "model": self._settings.model_tag,
+            "ollama": problem,
+        }
 
     # --- Listing -----------------------------------------------------------
     def list_documents(self) -> list[dict[str, Any]]:

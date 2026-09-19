@@ -55,4 +55,10 @@ USER appuser
 
 EXPOSE 8000
 
+# Reports "degraded" when Ollama is unreachable or the model is not pulled,
+# which is the failure that actually matters here.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request,json,sys; \
+sys.exit(0 if json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['status'] == 'ok' else 1)"
+
 CMD ["python", "-m", "docpipe.main"]
