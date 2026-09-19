@@ -1,0 +1,42 @@
+"""Tests for settings validation and configuration documentation."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from docpipe.core.config import Settings
+
+_ENV_EXAMPLE = Path(__file__).resolve().parents[1] / ".env.example"
+
+
+def test_env_example_documents_every_setting() -> None:
+    """Every Settings field must appear in .env.example.
+
+    The model default, the chunk/context knobs, and the suffix list have all
+    drifted between config.py and the docs before. This pins them together so a
+    new field cannot be added without documenting it.
+    """
+    documented = _ENV_EXAMPLE.read_text(encoding="utf-8")
+    missing = [
+        f"DOCPIPE_{name.upper()}"
+        for name in Settings.model_fields
+        if f"DOCPIPE_{name.upper()}=" not in documented
+    ]
+    assert not missing, f"undocumented settings in .env.example: {missing}"
+
+
+def test_env_example_model_tag_matches_the_code_default() -> None:
+    """The documented model must be the one the pipeline actually runs.
+
+    A mismatch here means the README tells a new user to pull the wrong model
+    and their first document fails.
+    """
+    documented = _ENV_EXAMPLE.read_text(encoding="utf-8")
+    assert f"DOCPIPE_MODEL_TAG={Settings().model_tag}" in documented
+
+
+def test_suffixes_accept_comma_separated_env_string() -> None:
+    assert Settings(supported_suffixes="pdf, .DOCX").supported_suffixes == (
+        ".pdf",
+        ".docx",
+    )

@@ -34,6 +34,7 @@ class Components:
     job_queue: JobQueue
     processor: DocumentProcessor
     runner: WatcherRunner
+    llm_service: LLMService
 
 
 def build_components(settings: Settings) -> Components:
@@ -93,6 +94,7 @@ def build_components(settings: Settings) -> Components:
         job_queue=job_queue,
         processor=processor,
         runner=runner,
+        llm_service=llm_service,
     )
 
 
@@ -105,6 +107,12 @@ def main() -> None:
     settings = Settings()
     configure_logging(level=settings.log_level, json_logs=settings.log_json)
     components = build_components(settings)
+
+    problem = components.llm_service.preflight()
+    if problem is None:
+        get_logger("docpipe.main").info("boot.preflight.ok", model=settings.model_tag)
+    else:
+        get_logger("docpipe.main").error("boot.preflight.failed", remedy=problem)
 
     if not settings.web_enabled:
         components.runner.start()

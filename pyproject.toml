@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doc-cleaner"
+description = "Local-first, layout-aware document ingestion pipeline for RAG."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dynamic = ["version"]
+authors = [{ name = "Martin Janev" }]
+keywords = ["rag", "docling", "ollama", "markdown", "pdf", "docx", "local-first"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup :: Markdown",
+]
+
+# Upper bounds are deliberate: docling in particular moves fast, and an
+# unbounded floor means a fresh install resolves to something never tested.
+dependencies = [
+    "docling>=2.0,<3",
+    "ollama>=0.3,<1",
+    "watchdog>=4,<7",
+    "pydantic>=2.6,<3",
+    "pydantic-settings>=2.2,<3",
+    "structlog>=24.1,<27",
+    "fastapi>=0.110,<1",
+    "uvicorn[standard]>=0.29,<1",
+    "python-multipart>=0.0.9,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[project.urls]
+Homepage = "https://github.com/martinjanev/doc-cleaner"
+Issues = "https://github.com/martinjanev/doc-cleaner/issues"
+
+[project.scripts]
+docpipe = "docpipe.main:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "docpipe.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["docpipe*"]
+
+[tool.setuptools.package-data]
+docpipe = ["web/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

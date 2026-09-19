@@ -6,7 +6,8 @@ services:
     environment:
       # Talk to the Ollama server running on the host machine.
       DOCPIPE_OLLAMA_HOST: http://host.docker.internal:11434
-      DOCPIPE_MODEL_TAG: mistral-nemo:12b  # see DOCPIPE_MODEL in docpipe/core/config.py
+      # DOCPIPE_MODEL_TAG is deliberately unset: the default lives in
+      # docpipe/core/config.py. Override it here only to pin a different model.
       DOCPIPE_INPUT_DIR: /app/data/input
       DOCPIPE_OUTPUT_DIR: /app/data/output
       DOCPIPE_STATE_FILE: /app/data/.pipeline_state.json

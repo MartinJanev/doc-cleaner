@@ -3,6 +3,9 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+build/
+dist/
 *.log
 .pytest_cache/
 
@@ -24,6 +27,4 @@ data/output/metadata/*
 !data/input/.gitkeep
 !data/output/markdown/.gitkeep
 !data/output/metadata/.gitkeep
-AGENTS.md
-.env.example
 PROJECT_NOTES.md

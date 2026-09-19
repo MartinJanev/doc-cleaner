@@ -7,7 +7,7 @@ raw ``MarkdownDocument`` into a ``RestructuredDocument`` with YAML front matter.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from docpipe.core.exceptions import LLMServiceError
 from docpipe.core.logging import get_logger
@@ -52,6 +52,49 @@ class LLMService:
         self._chunk_chars = chunk_chars
         self._num_ctx = num_ctx
         self._temperature = temperature
+
+    def preflight(self) -> Optional[str]:
+        """Check that Ollama is reachable and the configured model is pulled.
+
+        Returns ``None`` when everything is ready, otherwise a human-readable
+        problem description that names the command to fix it. Deliberately does
+        not raise: Ollama may be started after the pipeline, and the web UI is
+        more useful up (reporting the problem) than refusing to boot.
+        """
+        try:
+            listed = self._client.list()
+        except Exception as exc:  # transport error, host down, bad URL
+            return (
+                f"Cannot reach Ollama ({exc}). Start it with `ollama serve`, or "
+                f"point DOCPIPE_OLLAMA_HOST at the right address."
+            )
+
+        if self._model not in self._installed_models(listed):
+            return (
+                f"Model '{self._model}' is not available on the Ollama server. "
+                f"Pull it with `ollama pull {self._model}`, or set "
+                f"DOCPIPE_MODEL_TAG to a model you already have."
+            )
+        return None
+
+    @staticmethod
+    def _installed_models(listed: Any) -> set[str]:
+        """Model names from an Ollama ``list()`` reply, tag-insensitive.
+
+        Ollama returns a plain dict on older clients and a ``ListResponse`` on
+        newer ones; both shapes are accepted. A bare name is matched as
+        ``name:latest`` too, which is how Ollama stores an untagged pull.
+        """
+        models = listed.get("models") if isinstance(listed, dict) else getattr(listed, "models", [])
+        names: set[str] = set()
+        for entry in models or []:
+            name = entry.get("model") if isinstance(entry, dict) else getattr(entry, "model", None)
+            if not name:
+                continue
+            names.add(str(name))
+            if str(name).endswith(":latest"):
+                names.add(str(name).rsplit(":", 1)[0])
+        return names
 
     def refine(self, document: MarkdownDocument) -> RestructuredDocument:
         """Clean Markdown and prepend YAML front matter via the local LLM.

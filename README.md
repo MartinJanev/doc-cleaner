@@ -76,15 +76,24 @@ The codebase is layered, dependency-injected, and single-responsibility. Concret
 Install [Ollama](https://ollama.com), make sure it's running, then pull the default model:
 
 ```bash
-ollama pull mistral-nemo:12b
+ollama pull qwen2.5:14b
 ```
 
-Other supported models are listed in `docpipe/core/config.py` (`DOCPIPE_MODEL`).
+That default lives in one place — `DOCPIPE_MODEL` in [`docpipe/core/config.py`](docpipe/core/config.py). If 14B is too heavy for your machine, pull a smaller one and set `DOCPIPE_MODEL_TAG` to match:
 
-**2. Install Python dependencies** (Python 3.11+):
+| Model | RAM | Notes |
+| --- | --- | --- |
+| `qwen2.5:14b` | 16 GB+ | Default. Best cleanup and metadata quality. |
+| `mistral-nemo:12b` | 12 GB+ | Strong mid-size alternative. |
+| `qwen2.5:7b` | 8 GB+ | Reliable JSON on modest hardware. |
+| `llama3.1:8b` | 8 GB+ | Similar footprint, slightly weaker JSON. |
+
+doc-cleaner checks on startup that Ollama is reachable and that your model is pulled, and tells you exactly what to run if it isn't.
+
+**2. Install doc-cleaner** (Python 3.11+):
 
 ```bash
-pip install -r requirements.txt
+pip install -e .          # add ".[dev]" for the test and lint tooling
 ```
 
 **3. Start the pipeline:**
@@ -151,3 +160,7 @@ The pure-logic units (ledger, file routing, prompts) run without Docling or Olla
 ```bash
 pytest -q
 ```
+
+## License
+
+[MIT](LICENSE) © Martin Janev
