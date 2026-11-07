@@ -14,4 +14,4 @@ python-multipart>=0.0.9,<1
 pydantic>=2.6,<3
 pydantic-settings>=2.2,<3
 structlog>=24.1,<27
-watchdog>=4,<7
+watchdog>=4,<8
